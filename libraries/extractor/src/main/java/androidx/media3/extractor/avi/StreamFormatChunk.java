@@ -131,13 +131,16 @@ import com.google.common.collect.ImmutableList;
       case 0x31637661: // avc1
       case 0x31435641: // AVC1
         return MimeTypes.VIDEO_H264;
-      case 0x44495633: // 3VID
       case 0x78766964: // divx
       case 0x58564944: // DIVX
-      case 0x30355844: // DX50
-      case 0x34504d46: // FMP4
+        return MimeTypes.VIDEO_DIVX;
       case 0x64697678: // xvid
       case 0x44495658: // XVID
+        return MimeTypes.VIDEO_XVID;
+      case 0x30355844: // DX50
+        return MimeTypes.VIDEO_DX50;
+      case 0x44495633: // 3VID
+      case 0x34504d46: // FMP4
         return MimeTypes.VIDEO_MP4V;
       case 0x47504a4d: // MJPG
       case 0x67706a6d: // mjpg

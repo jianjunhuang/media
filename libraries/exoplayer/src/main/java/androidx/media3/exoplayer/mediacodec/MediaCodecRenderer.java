@@ -1231,6 +1231,7 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
     try {
       TraceUtil.beginSection("createCodec:" + codecName);
       codec = codecAdapterFactory.createAdapter(configuration);
+      android.util.Log.d("jianjun", "createAdapter", new Exception());
       codecRegisteredOnBufferAvailableListener =
           codec.registerOnBufferAvailableListener(new MediaCodecRendererCodecAdapterListener());
     } finally {

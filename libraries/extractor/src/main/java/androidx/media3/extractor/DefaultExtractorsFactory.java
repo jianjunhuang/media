@@ -534,6 +534,7 @@ public final class DefaultExtractorsFactory implements ExtractorsFactory {
         if (tsSubtitleFormats == null) {
           tsSubtitleFormats = ImmutableList.of();
         }
+        android.util.Log.d("jianjun", "TsExtractor textTrackTranscodingEnabled:" + textTrackTranscodingEnabled);
         extractors.add(
             new TsExtractor(
                 tsMode,

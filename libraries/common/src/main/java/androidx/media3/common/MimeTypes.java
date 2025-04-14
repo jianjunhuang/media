@@ -56,6 +56,10 @@ public final class MimeTypes {
   public static final String VIDEO_MPEG2 = BASE_TYPE_VIDEO + "/mpeg2";
   public static final String VIDEO_VC1 = BASE_TYPE_VIDEO + "/wvc1";
   public static final String VIDEO_DIVX = BASE_TYPE_VIDEO + "/divx";
+  public static final String VIDEO_XVID = BASE_TYPE_VIDEO + "/xvid";
+  public static final String VIDEO_DX50 = BASE_TYPE_VIDEO + "/dx50";
+  public static final String VIDEO_AVS = BASE_TYPE_VIDEO + "/avs";
+
   @UnstableApi public static final String VIDEO_FLV = BASE_TYPE_VIDEO + "/x-flv";
   public static final String VIDEO_DOLBY_VISION = BASE_TYPE_VIDEO + "/dolby-vision";
   public static final String VIDEO_OGG = BASE_TYPE_VIDEO + "/ogg";

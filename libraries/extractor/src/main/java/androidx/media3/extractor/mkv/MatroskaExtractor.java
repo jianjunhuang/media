@@ -297,6 +297,12 @@ public class MatroskaExtractor implements Extractor {
   private static final int LACING_EBML = 3;
 
   private static final int FOURCC_COMPRESSION_DIVX = 0x58564944;
+
+  private static final int FOURCC_COMPRESSION_DIVX_OTHER = 0x78766964;
+  private static final int FOURCC_COMPRESSION_DX50 = 0x30355844;
+  private static final int FOURCC_COMPRESSION_XVID = 0x64697678;
+  private static final int FOURCC_COMPRESSION_XVID_OTHER = 0x44495658;
+
   private static final int FOURCC_COMPRESSION_H263 = 0x33363248;
   private static final int FOURCC_COMPRESSION_VC1 = 0x31435657;
 
@@ -2535,8 +2541,17 @@ public class MatroskaExtractor implements Extractor {
       try {
         buffer.skipBytes(16); // size(4), width(4), height(4), planes(2), bitcount(2).
         long compression = buffer.readLittleEndianUnsignedInt();
+        android.util.Log.d("jianjun", "parseFourCcPrivate: compression = " + compression);
         if (compression == FOURCC_COMPRESSION_DIVX) {
           return new Pair<>(MimeTypes.VIDEO_DIVX, null);
+        } else if (compression == FOURCC_COMPRESSION_DIVX_OTHER) {
+          return new Pair<>(MimeTypes.VIDEO_DIVX, null);
+        } else if (compression == FOURCC_COMPRESSION_DX50) {
+          return new Pair<>(MimeTypes.VIDEO_DX50, null);
+        } else if (compression == FOURCC_COMPRESSION_XVID) {
+          return new Pair<>(MimeTypes.VIDEO_XVID, null);
+        } else if (compression == FOURCC_COMPRESSION_XVID_OTHER) {
+          return new Pair<>(MimeTypes.VIDEO_XVID, null);
         } else if (compression == FOURCC_COMPRESSION_H263) {
           return new Pair<>(MimeTypes.VIDEO_H263, null);
         } else if (compression == FOURCC_COMPRESSION_VC1) {

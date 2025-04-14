@@ -770,6 +770,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
   @Override
   public void endTracks() {
+    android.util.Log.d("jianjun", "ProgressiveMediaPeriod->endTracks", new Throwable());
     sampleQueuesBuilt = true;
     handler.post(maybeFinishPrepareRunnable);
   }
@@ -789,6 +790,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
   @Override
   public void onUpstreamFormatChanged(Format format) {
+    android.util.Log.d("jianjun", "ProgressiveMediaPeriod->onUpstreamFormatChanged: " + format, new Throwable());
     handler.post(maybeFinishPrepareRunnable);
   }
 
@@ -799,6 +801,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
   }
 
   private TrackOutput prepareTrackOutput(TrackId id) {
+    android.util.Log.d("jianjun", "ProgressiveMediaPeriod->prepareTrackOutput: " + id.id, new Throwable());
     int trackCount = sampleQueues.length;
     for (int i = 0; i < trackCount; i++) {
       if (id.equals(sampleQueueTrackIds[i])) {
@@ -850,6 +853,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
     for (int i = 0; i < trackCount; i++) {
       Format trackFormat = checkNotNull(sampleQueues[i].getUpstreamFormat());
       @Nullable String mimeType = trackFormat.sampleMimeType;
+      android.util.Log.d("jianjun", "ProgressiveMediaPeriod(trackCount:" + trackCount + ")->mimeType: " + mimeType);
       boolean isAudio = MimeTypes.isAudio(mimeType);
       boolean isAudioVideo = isAudio || MimeTypes.isVideo(mimeType);
       trackIsAudioVideoFlags[i] = isAudioVideo;

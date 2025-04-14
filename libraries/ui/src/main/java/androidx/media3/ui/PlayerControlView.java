@@ -1360,6 +1360,7 @@ public class PlayerControlView extends FrameLayout {
 
   private void updateTimeline() {
     @Nullable Player player = this.player;
+    android.util.Log.d("jianjun", "updateTimeline: " + player);
     if (player == null) {
       return;
     }
@@ -1373,13 +1374,16 @@ public class PlayerControlView extends FrameLayout {
             : Timeline.EMPTY;
     if (!timeline.isEmpty()) {
       int currentWindowIndex = player.getCurrentMediaItemIndex();
+      android.util.Log.d("jianjun", "multiWindowTimeBar: " + multiWindowTimeBar);
       int firstWindowIndex = multiWindowTimeBar ? 0 : currentWindowIndex;
       int lastWindowIndex = multiWindowTimeBar ? timeline.getWindowCount() - 1 : currentWindowIndex;
       for (int i = firstWindowIndex; i <= lastWindowIndex; i++) {
+        android.util.Log.d("jianjun", "windowIndex: " + i);
         if (i == currentWindowIndex) {
           currentWindowOffset = Util.usToMs(durationUs);
         }
         timeline.getWindow(i, window);
+        android.util.Log.d("jianjun", "getWindow: " + window.durationUs);
         if (window.durationUs == C.TIME_UNSET) {
           Assertions.checkState(!multiWindowTimeBar);
           break;
@@ -1411,6 +1415,7 @@ public class PlayerControlView extends FrameLayout {
           }
         }
         durationUs += window.durationUs;
+        android.util.Log.d("jianjun", "form timeline durationUs: " + durationUs, new Throwable());
       }
     } else if (player.isCommandAvailable(COMMAND_GET_CURRENT_MEDIA_ITEM)) {
       long playerDurationMs = player.getContentDuration();
@@ -1418,6 +1423,7 @@ public class PlayerControlView extends FrameLayout {
         durationUs = msToUs(playerDurationMs);
       }
     }
+    android.util.Log.d("jianjun", "durationUs: " + durationUs);
     long durationMs = Util.usToMs(durationUs);
     if (durationView != null) {
       durationView.setText(Util.getStringForTime(formatBuilder, formatter, durationMs));
