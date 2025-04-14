@@ -53,15 +53,21 @@ import androidx.media3.exoplayer.offline.DownloadRequest;
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
 import androidx.media3.exoplayer.source.MediaSource;
 import androidx.media3.exoplayer.source.ads.AdsLoader;
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector;
+import androidx.media3.exoplayer.trackselection.TrackSelector;
 import androidx.media3.exoplayer.util.DebugTextViewHelper;
 import androidx.media3.exoplayer.util.EventLogger;
+import androidx.media3.extractor.DefaultExtractorsFactory;
+import androidx.media3.extractor.ts.TsExtractor;
 import androidx.media3.ui.PlayerView;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
-/** An activity that plays media using {@link ExoPlayer}. */
+/**
+ * An activity that plays media using {@link ExoPlayer}.
+ */
 public class PlayerActivity extends AppCompatActivity
     implements OnClickListener, PlayerView.ControllerVisibilityListener {
 
@@ -315,7 +321,9 @@ public class PlayerActivity extends AppCompatActivity
             serverSideAdsLoader,
             new DefaultMediaSourceFactory(/* context= */ this)
                 .setDataSourceFactory(dataSourceFactory));
-    return new DefaultMediaSourceFactory(/* context= */ this)
+    DefaultExtractorsFactory extractorsFactory = new DefaultExtractorsFactory();
+    extractorsFactory.setTsExtractorMode(TsExtractor.MODE_MULTI_PMT);
+    return new DefaultMediaSourceFactory(/* context= */ this, extractorsFactory)
         .setDataSourceFactory(dataSourceFactory)
         .setDrmSessionManagerProvider(drmSessionManagerProvider)
         .setLocalAdInsertionComponents(
@@ -338,11 +346,11 @@ public class PlayerActivity extends AppCompatActivity
   private List<MediaItem> createMediaItems(Intent intent) {
     String action = intent.getAction();
     boolean actionIsListView = IntentUtil.ACTION_VIEW_LIST.equals(action);
-    if (!actionIsListView && !IntentUtil.ACTION_VIEW.equals(action)) {
-      showToast(getString(R.string.unexpected_intent_action, action));
-      finish();
-      return Collections.emptyList();
-    }
+//    if (!actionIsListView && !IntentUtil.ACTION_VIEW.equals(action)) {
+//      showToast(getString(R.string.unexpected_intent_action, action));
+//      finish();
+//      return Collections.emptyList();
+//    }
 
     List<MediaItem> mediaItems =
         createMediaItems(intent, DemoUtil.getDownloadTracker(/* context= */ this));
@@ -467,9 +475,17 @@ public class PlayerActivity extends AppCompatActivity
   private class PlayerEventListener implements Player.Listener {
 
     @Override
+    public void onTrackSelectionParametersChanged(TrackSelectionParameters parameters) {
+      Player.Listener.super.onTrackSelectionParametersChanged(parameters);
+      android.util.Log.d("jianjun", "PlayerActivity->onTrackSelectionParametersChanged: " + parameters);
+    }
+
+    @Override
     public void onPlaybackStateChanged(@Player.State int playbackState) {
       if (playbackState == Player.STATE_ENDED) {
         showControls();
+      } else if (playbackState == Player.STATE_READY) {
+        android.util.Log.d("jianjun", "PlayerActivity->onPlaybackStateChanged: STATE_READY");
       }
       updateButtonVisibility();
     }
@@ -488,6 +504,15 @@ public class PlayerActivity extends AppCompatActivity
     @Override
     @SuppressWarnings("ReferenceEquality")
     public void onTracksChanged(Tracks tracks) {
+      android.util.Log.d("jianjun", "PlayerActivity->onTracksChanged: " + tracks, new Throwable());
+
+      List<Tracks.Group> groups = tracks.getGroups();
+      for (int i = 0; i < groups.size(); i++) {
+        Tracks.Group group = groups.get(i);
+        for (int j = 0; j < group.length; j++) {
+          android.util.Log.d("jianjun", "PlayerActivity->onTracksChanged: " + group.getTrackFormat(j));
+        }
+      }
       updateButtonVisibility();
       if (tracks == lastSeenTracks) {
         return;
