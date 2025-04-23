@@ -277,8 +277,10 @@ public class PlayerActivity extends AppCompatActivity
       ExoPlayer.Builder playerBuilder =
           new ExoPlayer.Builder(/* context= */ this)
               .setMediaSourceFactory(createMediaSourceFactory());
+//      setRenderersFactory(
+//          playerBuilder, intent.getBooleanExtra(IntentUtil.PREFER_EXTENSION_DECODERS_EXTRA, false));
       setRenderersFactory(
-          playerBuilder, intent.getBooleanExtra(IntentUtil.PREFER_EXTENSION_DECODERS_EXTRA, false));
+          playerBuilder, true);
       player = playerBuilder.build();
       player.setTrackSelectionParameters(trackSelectionParameters);
       player.addListener(new PlayerEventListener());
@@ -334,6 +336,7 @@ public class PlayerActivity extends AppCompatActivity
   @OptIn(markerClass = UnstableApi.class)
   private void setRenderersFactory(
       ExoPlayer.Builder playerBuilder, boolean preferExtensionDecoders) {
+    android.util.Log.d("jianjun", "setRenderersFactory: " + preferExtensionDecoders);
     RenderersFactory renderersFactory =
         DemoUtil.buildRenderersFactory(/* context= */ this, preferExtensionDecoders);
     playerBuilder.setRenderersFactory(renderersFactory);

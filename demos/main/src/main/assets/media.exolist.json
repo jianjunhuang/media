@@ -7,6 +7,10 @@
         "uri": "https://storage.googleapis.com/wvmedia/clear/h264/tears/tears.mpd"
       },
       {
+        "name": "ape",
+        "uri": "/sdcard/forget.ape"
+      },
+      {
         "name": "UHD (MP4, H264)",
         "uri": "https://storage.googleapis.com/wvmedia/clear/h264/tears/tears_uhd.mpd"
       },

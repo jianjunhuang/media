@@ -36,16 +36,22 @@ import androidx.media3.exoplayer.audio.AudioSink.SinkFormatSupport;
 import androidx.media3.exoplayer.audio.DecoderAudioRenderer;
 import androidx.media3.exoplayer.audio.DefaultAudioSink;
 
-/** Decodes and renders audio using FFmpeg. */
+/**
+ * Decodes and renders audio using FFmpeg.
+ */
 @UnstableApi
 public final class FfmpegAudioRenderer extends DecoderAudioRenderer<FfmpegAudioDecoder> {
 
   private static final String TAG = "FfmpegAudioRenderer";
 
-  /** The number of input and output buffers. */
+  /**
+   * The number of input and output buffers.
+   */
   private static final int NUM_BUFFERS = 16;
 
-  /** The default input buffer size. */
+  /**
+   * The default input buffer size.
+   */
   private static final int DEFAULT_INPUT_BUFFER_SIZE = 960 * 6;
 
   public FfmpegAudioRenderer() {
@@ -55,9 +61,9 @@ public final class FfmpegAudioRenderer extends DecoderAudioRenderer<FfmpegAudioD
   /**
    * Creates a new instance.
    *
-   * @param eventHandler A handler to use when delivering events to {@code eventListener}. May be
-   *     null if delivery of events is not required.
-   * @param eventListener A listener of events. May be null if delivery of events is not required.
+   * @param eventHandler    A handler to use when delivering events to {@code eventListener}. May be
+   *                        null if delivery of events is not required.
+   * @param eventListener   A listener of events. May be null if delivery of events is not required.
    * @param audioProcessors Optional {@link AudioProcessor}s that will process audio before output.
    */
   public FfmpegAudioRenderer(
@@ -73,10 +79,10 @@ public final class FfmpegAudioRenderer extends DecoderAudioRenderer<FfmpegAudioD
   /**
    * Creates a new instance.
    *
-   * @param eventHandler A handler to use when delivering events to {@code eventListener}. May be
-   *     null if delivery of events is not required.
+   * @param eventHandler  A handler to use when delivering events to {@code eventListener}. May be
+   *                      null if delivery of events is not required.
    * @param eventListener A listener of events. May be null if delivery of events is not required.
-   * @param audioSink The sink to which audio will be output.
+   * @param audioSink     The sink to which audio will be output.
    */
   public FfmpegAudioRenderer(
       @Nullable Handler eventHandler,
@@ -97,7 +103,12 @@ public final class FfmpegAudioRenderer extends DecoderAudioRenderer<FfmpegAudioD
       return C.FORMAT_UNSUPPORTED_TYPE;
     } else if (!FfmpegLibrary.supportsFormat(mimeType)
         || (!sinkSupportsFormat(format, C.ENCODING_PCM_16BIT)
-            && !sinkSupportsFormat(format, C.ENCODING_PCM_FLOAT))) {
+        && !sinkSupportsFormat(format, C.ENCODING_PCM_FLOAT))) {
+      android.util.Log.d("jianjun", "supportsFormatInternal: " + format
+              + ", supportsFormat: " + FfmpegLibrary.supportsFormat(mimeType)
+              + ", sinkSupportsFormat: " + sinkSupportsFormat(format, C.ENCODING_PCM_16BIT)
+              + ", sinkSupportsFormat: " + sinkSupportsFormat(format, C.ENCODING_PCM_FLOAT)
+          , new Throwable());
       return C.FORMAT_UNSUPPORTED_SUBTYPE;
     } else if (format.cryptoType != C.CRYPTO_TYPE_NONE) {
       return C.FORMAT_UNSUPPORTED_DRM;

@@ -299,6 +299,10 @@ AVCodecContext *createContext(JNIEnv *env, const AVCodec *codec,
     context->sample_rate = rawSampleRate;
     av_channel_layout_default(&context->ch_layout, rawChannelCount);
   }
+  LOGE("ffmpeg-createContext: rawSampleRate: %d, rawChannelCount: %d",
+     rawSampleRate, rawChannelCount);
+  LOGE("ffmpeg-createContext: sample_fmt: %d, sample_rate: %d, channel_layout: %d",
+     context->sample_fmt, context->sample_rate, &context->ch_layout.nb_channels);
   context->err_recognition = AV_EF_IGNORE_ERR;
   int result = avcodec_open2(context, codec, NULL);
   if (result < 0) {

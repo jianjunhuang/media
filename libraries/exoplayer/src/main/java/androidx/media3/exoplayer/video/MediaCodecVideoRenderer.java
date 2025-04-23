@@ -804,6 +804,7 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer
       boolean requiresSecureDecoder,
       boolean requiresTunnelingDecoder)
       throws DecoderQueryException {
+    android.util.Log.d("jianjun", "getDecoderInfos: " + format, new Throwable());
     if (format.sampleMimeType == null) {
       return ImmutableList.of();
     }

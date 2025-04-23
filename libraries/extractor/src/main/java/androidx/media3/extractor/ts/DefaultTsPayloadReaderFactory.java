@@ -148,6 +148,7 @@ public final class DefaultTsPayloadReaderFactory implements TsPayloadReader.Fact
   @Override
   @Nullable
   public TsPayloadReader createPayloadReader(int streamType, EsInfo esInfo) {
+    android.util.Log.d("jianjun", "createPayloadReader: type" + streamType);
     switch (streamType) {
       case TsExtractor.TS_STREAM_TYPE_MPA:
       case TsExtractor.TS_STREAM_TYPE_MPA_LSF:

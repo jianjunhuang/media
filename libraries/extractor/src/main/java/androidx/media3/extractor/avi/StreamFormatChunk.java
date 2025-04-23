@@ -145,6 +145,10 @@ import com.google.common.collect.ImmutableList;
       case 0x47504a4d: // MJPG
       case 0x67706a6d: // mjpg
         return MimeTypes.VIDEO_MJPEG;
+      case 0x33564944: //msmpeg4v3
+        return MimeTypes.VIDEO_MSMPEG4V3;
+      case 0x31435657: //VC1
+        return MimeTypes.VIDEO_VC1;
       default:
         return null;
     }
