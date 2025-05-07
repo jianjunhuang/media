@@ -115,6 +115,8 @@ import com.google.common.collect.ImmutableList;
         return MimeTypes.AUDIO_AC3;
       case 0x2001: // WAVE_FORMAT_DTS2
         return MimeTypes.AUDIO_DTS;
+      case 0x50: //mp2
+        return MimeTypes.AUDIO_MPEG_L2;
       default:
         return null;
     }
@@ -122,6 +124,7 @@ import com.google.common.collect.ImmutableList;
 
   @Nullable
   private static String getMimeTypeFromCompression(int compression) {
+    android.util.Log.d("jianjun", "getMimeTypeFromCompression: " + Integer.toHexString(compression));
     switch (compression) {
       case 0x3234504d: // MP42
         return MimeTypes.VIDEO_MP42;
@@ -149,6 +152,10 @@ import com.google.common.collect.ImmutableList;
         return MimeTypes.VIDEO_MSMPEG4V3;
       case 0x31435657: //VC1
         return MimeTypes.VIDEO_VC1;
+      case 0x33564d57: //wmv3
+        return MimeTypes.VIDEO_WMV3;
+      case 0x3247504d: //mpeg2video
+        return MimeTypes.VIDEO_MPEG2;
       default:
         return null;
     }
