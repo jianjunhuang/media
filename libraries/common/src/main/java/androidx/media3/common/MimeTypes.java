@@ -62,6 +62,8 @@ public final class MimeTypes {
 
   public static final String VIDEO_MSMPEG4V3 = BASE_TYPE_VIDEO + "/msmpeg4v3";
 
+  public static final String VIDEO_WMV3 = BASE_TYPE_VIDEO + "/wmv3";
+
   @UnstableApi public static final String VIDEO_FLV = BASE_TYPE_VIDEO + "/x-flv";
   public static final String VIDEO_DOLBY_VISION = BASE_TYPE_VIDEO + "/dolby-vision";
   public static final String VIDEO_OGG = BASE_TYPE_VIDEO + "/ogg";
