@@ -1071,6 +1071,7 @@ public final class MediaExtractorCompat {
     @Override
     public void durationUs(long durationUs) {
       this.trackDurationUs = durationUs;
+      android.util.Log.d("jianjun", "MediaExtractorCompat: durationUs: " + durationUs, new Throwable());
       super.durationUs(durationUs);
     }
 

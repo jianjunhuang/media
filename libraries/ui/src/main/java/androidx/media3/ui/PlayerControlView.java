@@ -1415,7 +1415,7 @@ public class PlayerControlView extends FrameLayout {
           }
         }
         durationUs += window.durationUs;
-        android.util.Log.d("jianjun", "form timeline durationUs: " + durationUs, new Throwable());
+        android.util.Log.d("jianjun", "get duration form timeline durationUs: " + durationUs, new Throwable());
       }
     } else if (player.isCommandAvailable(COMMAND_GET_CURRENT_MEDIA_ITEM)) {
       long playerDurationMs = player.getContentDuration();

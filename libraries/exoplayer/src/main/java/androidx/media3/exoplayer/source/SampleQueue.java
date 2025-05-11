@@ -813,6 +813,7 @@ public class SampleQueue implements TrackOutput {
     }
 
     isLastSampleQueued = (sampleFlags & C.BUFFER_FLAG_LAST_SAMPLE) != 0;
+    android.util.Log.d("jianjun", "SampleQueue - commitSample(timeUs): " + timeUs, new Throwable());
     largestQueuedTimestampUs = max(largestQueuedTimestampUs, timeUs);
 
     int relativeEndIndex = getRelativeIndex(length);

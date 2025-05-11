@@ -325,6 +325,7 @@ public class PlayerActivity extends AppCompatActivity
                 .setDataSourceFactory(dataSourceFactory));
     DefaultExtractorsFactory extractorsFactory = new DefaultExtractorsFactory();
     extractorsFactory.setTsExtractorMode(TsExtractor.MODE_MULTI_PMT);
+    extractorsFactory.setConstantBitrateSeekingEnabled(true);
     return new DefaultMediaSourceFactory(/* context= */ this, extractorsFactory)
         .setDataSourceFactory(dataSourceFactory)
         .setDrmSessionManagerProvider(drmSessionManagerProvider)

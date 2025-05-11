@@ -82,6 +82,7 @@ public final class BundledExtractorsAdapter implements ProgressiveMediaExtractor
         try {
           if (extractor.sniff(extractorInput)) {
             this.extractor = extractor;
+            android.util.Log.w("jianjun", "sniff =========> " + this.extractor);
             break;
           } else {
             List<SniffFailure> sniffFailureDetails = extractor.getSniffFailureDetails();

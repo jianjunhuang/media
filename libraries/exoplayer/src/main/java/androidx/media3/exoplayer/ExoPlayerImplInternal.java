@@ -2946,6 +2946,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
   private void maybeContinueLoading() {
     shouldContinueLoading = shouldContinueLoading();
+    android.util.Log.d("jianjun", "ExoPlayerImplInternal: maybeContinueLoading=" + shouldContinueLoading);
     if (shouldContinueLoading) {
       MediaPeriodHolder loadingPeriod = checkNotNull(queue.getLoadingPeriod());
       loadingPeriod.continueLoading(

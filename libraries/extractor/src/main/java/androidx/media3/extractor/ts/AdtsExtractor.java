@@ -147,6 +147,7 @@ public final class AdtsExtractor implements Extractor {
 
   @Override
   public boolean sniff(ExtractorInput input) throws IOException {
+    android.util.Log.d("jianjun", "AdtsExtractor sniff", new Exception());
     // Skip any ID3 headers.
     int startPosition = peekId3Header(input);
 
@@ -196,6 +197,7 @@ public final class AdtsExtractor implements Extractor {
 
   @Override
   public void init(ExtractorOutput output) {
+    android.util.Log.d("jianjun", "AdtsExtractor init", new Exception());
     this.extractorOutput = output;
     reader.createTracks(output, new TrackIdGenerator(0, 1));
     output.endTracks();

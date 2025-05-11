@@ -435,7 +435,9 @@ public abstract class MappingTrackSelector extends TrackSelector {
 
     Tracks tracks = TrackSelectionUtil.buildTracks(mappedTrackInfo, result.second);
 
-    return new TrackSelectorResult(result.first, result.second, tracks, mappedTrackInfo);
+    TrackSelectorResult trackSelectorResult = new TrackSelectorResult(result.first, result.second, tracks, mappedTrackInfo);
+    android.util.Log.d("jianjun", "MappingTrackSelector -- timeline.getDurationUs:" + timeline, new Throwable());
+    return trackSelectorResult;
   }
 
   /**
