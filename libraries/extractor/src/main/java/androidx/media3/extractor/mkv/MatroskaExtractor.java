@@ -70,6 +70,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -426,7 +427,7 @@ public class MatroskaExtractor implements Extractor {
   private final EbmlReader reader;
   private final VarintReader varintReader;
   private final SparseArray<Track> tracks;
-  private final boolean seekForCuesEnabled;
+  private boolean seekForCuesEnabled;
   private final boolean parseSubtitlesDuringExtraction;
   private final SubtitleParser.Factory subtitleParserFactory;
 
@@ -599,7 +600,7 @@ public class MatroskaExtractor implements Extractor {
     boolean continueReading = true;
     while (continueReading && !haveOutputSample) {
       continueReading = reader.read(input);
-      if (continueReading && maybeSeekForCues(seekPosition, input.getPosition())) {
+      if (continueReading && maybeSeekForCues(seekPosition, input.getPosition(), input.getLength())) {
         return Extractor.RESULT_SEEK;
       }
     }
@@ -750,6 +751,7 @@ public class MatroskaExtractor implements Extractor {
           throw ParserException.createForMalformedContainer(
               "Multiple Segment elements not supported", /* cause= */ null);
         }
+        //android.util.Log.d("jianjun", "MatroskaExtractor --- startMasterElements: segmentContentPosition=" + contentPosition, new Throwable());
         segmentContentPosition = contentPosition;
         segmentContentSize = contentSize;
         break;
@@ -760,11 +762,13 @@ public class MatroskaExtractor implements Extractor {
       case ID_CUES:
         cueTimesUs = new LongArray();
         cueClusterPositions = new LongArray();
+        //android.util.Log.d("jianjun", "MatroskaExtractor --- startMasterElement ID_CUES");
         break;
       case ID_CUE_POINT:
         seenClusterPositionForCurrentCuePoint = false;
         break;
       case ID_CLUSTER:
+        //android.util.Log.d("jianjun", "MatroskaExtractor --- startMasterElement ID_CLUSTER");
         if (!sentSeekMap) {
           // We need to build cues before parsing the cluster.
           if (seekForCuesEnabled && cuesContentPosition != C.INDEX_UNSET) {
@@ -773,6 +777,7 @@ public class MatroskaExtractor implements Extractor {
           } else {
             // We don't know where the Cues element is located. It's most likely omitted. Allow
             // playback, but disable seeking.
+            //android.util.Log.d("jianjun", "MatroskaExtractor --- startMasterElement sentSeekMap=true, duration=" + durationUs + ", cueTimesUs=" + cueTimesUs + " ,cueClusterPositions=" + cueClusterPositions);
             extractorOutput.seekMap(new SeekMap.Unseekable(durationUs));
             sentSeekMap = true;
           }
@@ -824,14 +829,17 @@ public class MatroskaExtractor implements Extractor {
               "Mandatory element SeekID or SeekPosition not found", /* cause= */ null);
         }
         if (seekEntryId == ID_CUES) {
+          //android.util.Log.d("jianjun", "MatroskaExtractor --- update cuesContentPosition, seekEntryPosition="+seekEntryPosition);
           cuesContentPosition = seekEntryPosition;
         }
         break;
       case ID_CUES:
         if (!sentSeekMap) {
+          //android.util.Log.d("jianjun", "MatroskaExtractor --- endMasterElementID_CUES sentSeekMap=false, duration=" + durationUs);
           extractorOutput.seekMap(buildSeekMap(cueTimesUs, cueClusterPositions));
           sentSeekMap = true;
         } else {
+          //android.util.Log.d("jianjun", "MatroskaExtractor --- endMasterElementID_CUES sentSeekMap=, duration=" + durationUs);
           // We have already built the cues. Ignore.
         }
         this.cueTimesUs = null;
@@ -926,6 +934,7 @@ public class MatroskaExtractor implements Extractor {
   protected void integerElement(int id, long value) throws ParserException {
     switch (id) {
       case ID_EBML_READ_VERSION:
+        //android.util.Log.d("jianjun", "MatroskaExtractor --- integerElement: id=ID_EBML_READ_VERSION");
         // Validate that EBMLReadVersion is supported. This extractor only supports v1.
         if (value != 1) {
           throw ParserException.createForMalformedContainer(
@@ -933,6 +942,7 @@ public class MatroskaExtractor implements Extractor {
         }
         break;
       case ID_DOC_TYPE_READ_VERSION:
+        //android.util.Log.d("jianjun", "MatroskaExtractor --- integerElement: id=ID_DOC_TYPE_READ_VERSION");
         // Validate that DocTypeReadVersion is supported. This extractor only supports up to v2.
         if (value < 1 || value > 2) {
           throw ParserException.createForMalformedContainer(
@@ -940,11 +950,14 @@ public class MatroskaExtractor implements Extractor {
         }
         break;
       case ID_SEEK_POSITION:
+        //android.util.Log.d("jianjun", "MatroskaExtractor --- integerElement: id=ID_SEEK_POSITION");
         // Seek Position is the relative offset beginning from the Segment. So to get absolute
         // offset from the beginning of the file, we need to add segmentContentPosition to it.
         seekEntryPosition = value + segmentContentPosition;
+        //android.util.Log.d("jianjun", "MatroskaExtractor --- update seekEntryPosition , seekEntryPosition="+seekEntryPosition + ", value=" + value + ", segmentContentPosition="+segmentContentPosition);
         break;
       case ID_TIMECODE_SCALE:
+        //android.util.Log.d("jianjun", "MatroskaExtractor --- integerElement: id=ID_TIMECODE_SCALE");
         timecodeScale = value;
         break;
       case ID_PIXEL_WIDTH:
@@ -1037,10 +1050,12 @@ public class MatroskaExtractor implements Extractor {
         }
         break;
       case ID_CUE_TIME:
+        //android.util.Log.d("jianjun", "MatroskaExtractor --- integerElement: id=ID_CUE_TIME");
         assertInCues(id);
         cueTimesUs.add(scaleTimecodeToUs(value));
         break;
       case ID_CUE_CLUSTER_POSITION:
+//        android.util.Log.d("jianjun", "MatroskaExtractor --- integerElement: id=ID_CUE_CLUSTER_POSITION");
         if (!seenClusterPositionForCurrentCuePoint) {
           assertInCues(id);
           // If there's more than one video/audio track, then there could be more than one
@@ -1886,6 +1901,9 @@ public class MatroskaExtractor implements Extractor {
    */
   private SeekMap buildSeekMap(
       @Nullable LongArray cueTimesUs, @Nullable LongArray cueClusterPositions) {
+//    android.util.Log.d("jianjun", "MatroskaExtractor --- buildSeekMap, cueTimesUs=" + cueTimesUs + "\n" +
+//        "cueClusterPositions=" + cueClusterPositions
+//        );
     if (segmentContentPosition == C.INDEX_UNSET
         || durationUs == C.TIME_UNSET
         || cueTimesUs == null
@@ -1893,6 +1911,7 @@ public class MatroskaExtractor implements Extractor {
         || cueClusterPositions == null
         || cueClusterPositions.size() != cueTimesUs.size()) {
       // Cues information is missing or incomplete.
+//      android.util.Log.d("jianjun", "MatroskaExtractor --- buildSeekMap Unseekable");
       return new SeekMap.Unseekable(durationUs);
     }
     int cuePointsSize = cueTimesUs.size();
@@ -1941,10 +1960,18 @@ public class MatroskaExtractor implements Extractor {
    * @param currentPosition Current position of the input.
    * @return Whether the seek position was updated.
    */
-  private boolean maybeSeekForCues(PositionHolder seekPosition, long currentPosition) {
+  private boolean maybeSeekForCues(PositionHolder seekPosition, long currentPosition, long length) {
+//    android.util.Log.d("jianjun", "MatroskaExtractor --- maybeSeekForCues, seekPosition=" + seekPosition +" , currentPosition=" + currentPosition);
     if (seekForCues) {
       seekPositionAfterBuildingCues = currentPosition;
-      seekPosition.position = cuesContentPosition;
+      //TODO 如果长度不对直接不允许 seek，避免失败
+      if (cuesContentPosition > length) {
+//        android.util.Log.e("jianjun", "MatroskaExtractor --- maybeSeekForCues,  cuesContentPosition("+cuesContentPosition +") > length(" + length + ")");
+        seekForCuesEnabled = false;
+      } else {
+//        android.util.Log.e("jianjun", "MatroskaExtractor --- maybeSeekForCues,  cuesContentPosition=" + cuesContentPosition);
+        seekPosition.position = cuesContentPosition;
+      }
       seekForCues = false;
       return true;
     }
@@ -1952,9 +1979,12 @@ public class MatroskaExtractor implements Extractor {
     // we seeked to get to the Cues in the first place.
     if (sentSeekMap && seekPositionAfterBuildingCues != C.INDEX_UNSET) {
       seekPosition.position = seekPositionAfterBuildingCues;
+//      android.util.Log.d("jianjun", "MatroskaExtractor --- maybeSeekForCues, seekPositionAfterBuildingCues=" + seekPositionAfterBuildingCues);
       seekPositionAfterBuildingCues = C.INDEX_UNSET;
       return true;
     }
+
+//    android.util.Log.d("jianjun", "MatroskaExtractor --- maybeSeekForCues, returen false");
     return false;
   }
 
@@ -2541,7 +2571,7 @@ public class MatroskaExtractor implements Extractor {
       try {
         buffer.skipBytes(16); // size(4), width(4), height(4), planes(2), bitcount(2).
         long compression = buffer.readLittleEndianUnsignedInt();
-        android.util.Log.d("jianjun", "parseFourCcPrivate: compression = " + compression);
+//        android.util.Log.d("jianjun", "parseFourCcPrivate: compression = " + compression);
         if (compression == FOURCC_COMPRESSION_DIVX) {
           return new Pair<>(MimeTypes.VIDEO_DIVX, null);
         } else if (compression == FOURCC_COMPRESSION_DIVX_OTHER) {
