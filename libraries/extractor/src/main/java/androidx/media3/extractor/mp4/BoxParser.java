@@ -1138,6 +1138,7 @@ public final class BoxParser {
           || childAtomType == Mp4Box.TYPE_Opus
           || childAtomType == Mp4Box.TYPE_fLaC
           || childAtomType == Mp4Box.TYPE_iamf) {
+        android.util.Log.d("jianjun", "parseStsd: childAtomType = " + childAtomType);
         parseAudioSampleEntry(
             stsd,
             childAtomType,
@@ -2033,6 +2034,7 @@ public final class BoxParser {
       parent.setPosition(childPosition);
       int childAtomSize = parent.readInt();
       ExtractorUtil.checkContainerInput(childAtomSize > 0, "childAtomSize must be positive");
+      //TODO mp3float
       int childAtomType = parent.readInt();
       if (childAtomType == Mp4Box.TYPE_mhaC) {
         // See ISO_IEC_23008-3;2022 MHADecoderConfigurationRecord
@@ -2081,6 +2083,7 @@ public final class BoxParser {
                 ? childPosition
                 : findBoxPosition(parent, Mp4Box.TYPE_esds, childPosition, childAtomSize);
         if (esdsAtomPosition != C.INDEX_UNSET) {
+          //TODO mp3float
           esdsData = parseEsdsFromParent(parent, esdsAtomPosition);
           mimeType = esdsData.mimeType;
           @Nullable byte[] initializationDataBytes = esdsData.initializationData;

@@ -553,8 +553,8 @@ public final class MimeTypes {
         return MimeTypes.VIDEO_MPEG2;
       case 0x6A:
         return MimeTypes.VIDEO_MPEG;
-      case 0x69:
-      case 0x6B:
+      case 0x69://Audio ISO/IEC 13818-3 ,MPEG-2 音频 (也称为 MPEG-2 BC - 向后兼容)
+      case 0x6B:  //Audio ISO/IEC 11172-3 ,MPEG-1 音频 (包含 Layer I, II, III)
         return MimeTypes.AUDIO_MPEG;
       case 0x6C:
         return MimeTypes.IMAGE_JPEG;
