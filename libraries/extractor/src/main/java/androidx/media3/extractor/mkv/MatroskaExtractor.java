@@ -66,11 +66,11 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -306,6 +306,8 @@ public class MatroskaExtractor implements Extractor {
 
   private static final int FOURCC_COMPRESSION_H263 = 0x33363248;
   private static final int FOURCC_COMPRESSION_VC1 = 0x31435657;
+
+  private final ParsableByteArray seiPayload = new ParsableByteArray();
 
   /**
    * A template for the prefix that must be added to each subrip sample.
@@ -574,6 +576,8 @@ public class MatroskaExtractor implements Extractor {
         parseSubtitlesDuringExtraction
             ? new SubtitleTranscodingExtractorOutput(output, subtitleParserFactory)
             : output;
+
+    android.util.Log.d("jianjun", "MatroskaExtractor -- init -- out=" + output);
   }
 
   @CallSuper
@@ -1719,6 +1723,45 @@ public class MatroskaExtractor implements Extractor {
           sampleBytesRead += nalUnitLengthFieldLength;
           nalLength.setPosition(0);
           sampleCurrentNalBytesRemaining = nalLength.readUnsignedIntToInt();
+
+          // *** 在这里插入 SEI 解析逻辑 ***
+          if (sampleCurrentNalBytesRemaining > 0) {
+            int nalUnitSize = sampleCurrentNalBytesRemaining;
+            // 读取 NALU
+            seiPayload.reset(nalUnitSize);
+            input.peekFully(seiPayload.getData(), 0, nalUnitSize);
+            seiPayload.setPosition(0);
+            int nalUnitType;
+            if (CODEC_ID_H264.equals(track.codecId)) {
+              // H.264: nal_unit_type is bits 3-7 of the first byte
+              nalUnitType = seiPayload.getData()[0] & 0x1F;
+            } else { // H.265
+              // H.265: nal_unit_type is bits 2-7 of the first byte
+              nalUnitType = (seiPayload.getData()[0] >> 1) & 0x3F;
+            }
+
+            // 3. 判断是否为 SEI
+            boolean isH264Sei = CODEC_ID_H264.equals(track.codecId) && nalUnitType == 6;
+            boolean isH265Sei =
+                CODEC_ID_H265.equals(track.codecId) && (nalUnitType == 39 || nalUnitType == 40);
+
+            if (isH264Sei || isH265Sei) {
+              //读取 (sampleCurrentNalBytesRemaining - header) 字节的 SEI payload 并解析
+              int headerSize = isH264Sei ? 1 : 2;
+              int payloadSize = nalUnitSize - headerSize;
+              if (payloadSize > 0) {
+                String seiPayloadData = new String(seiPayload.getData(), headerSize, payloadSize,
+                    Charset.forName("UTF-8"));
+                Log.d(TAG, "SEI NAL unit found, info: " + seiPayloadData);
+                if (seiPayloadData.toLowerCase().contains("divx")) {
+                    //TODO jianjun: callback instead of exception
+                    throw ParserException.createForMalformedContainer(
+                        "Unexpected DIVX video.", /* cause= */ null);
+                }
+              }
+            }
+          }
+
           // Write a start code for the current NAL unit.
           nalStartCode.setPosition(0);
           output.sampleData(nalStartCode, 4);
@@ -2186,6 +2229,8 @@ public class MatroskaExtractor implements Extractor {
       @C.PcmEncoding int pcmEncoding = Format.NO_VALUE;
       @Nullable List<byte[]> initializationData = null;
       @Nullable String codecs = null;
+      android.util.Log.d(TAG,
+          "MatroskaExtractor -- initializeOutput -- trackId=" + trackId + ", codecId=" + codecId);
       switch (codecId) {
         case CODEC_ID_VP8:
           mimeType = MimeTypes.VIDEO_VP8;
@@ -2490,6 +2535,7 @@ public class MatroskaExtractor implements Extractor {
               .build();
 
       this.output = output.track(number, type);
+      android.util.Log.d(TAG, "MatroskaExtractor -- initializeOutput: format=" + format);
       this.output.format(format);
     }
 
