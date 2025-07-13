@@ -135,7 +135,7 @@ public final class JLog {
   private static final Object lock = new Object();
 
   @GuardedBy("lock")
-  private static int logLevel = LOG_LEVEL_ALL;
+  private static int logLevel = LOG_LEVEL_OFF;
 
   @GuardedBy("lock")
   private static boolean logStackTraces = true;
