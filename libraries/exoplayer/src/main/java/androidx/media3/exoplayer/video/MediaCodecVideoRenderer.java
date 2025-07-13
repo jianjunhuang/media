@@ -1108,8 +1108,8 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer
 //        mVideoDumpFileOutputStream.close();
 //      }
       super.onDisabled();
-    } catch (IOException e) {
-      android.util.Log.e(TAG, "onDisabled: ", e);
+//    } catch (IOException e) {
+//      android.util.Log.e(TAG, "onDisabled: ", e);
     } finally {
       eventDispatcher.disabled(decoderCounters);
       eventDispatcher.videoSizeChanged(VideoSize.UNKNOWN);
@@ -1124,8 +1124,8 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer
 //        mVideoDumpFileOutputStream.close();
 //      }
       super.onReset();
-    } catch (IOException e) {
-      android.util.Log.e(TAG, "onReset: ", e);
+//    } catch (IOException e) {
+//      android.util.Log.e(TAG, "onReset: ", e);
     } finally {
       hasSetVideoSink = false;
       startPositionUs = C.TIME_UNSET;
