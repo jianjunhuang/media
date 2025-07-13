@@ -899,6 +899,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
   }
 
   private void setState(int state) {
+    androidx.media3.common.util.JLog.d("jianjun", "setState(" + state + ")", new Throwable());
     if (playbackInfo.playbackState != state) {
       if (state != Player.STATE_BUFFERING) {
         playbackMaybeBecameStuckAtMs = C.TIME_UNSET;
@@ -2946,7 +2947,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
   private void maybeContinueLoading() {
     shouldContinueLoading = shouldContinueLoading();
-    android.util.Log.d("jianjun", "ExoPlayerImplInternal: maybeContinueLoading=" + shouldContinueLoading);
+    //androidx.media3.common.util.JLog.d("jianjun", "ExoPlayerImplInternal: maybeContinueLoading=" + shouldContinueLoading);
     if (shouldContinueLoading) {
       MediaPeriodHolder loadingPeriod = checkNotNull(queue.getLoadingPeriod());
       loadingPeriod.continueLoading(

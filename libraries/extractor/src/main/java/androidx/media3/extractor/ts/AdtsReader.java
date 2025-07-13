@@ -152,7 +152,7 @@ public final class AdtsReader implements ElementaryStreamReader {
     formatId = idGenerator.getFormatId();
     output = extractorOutput.track(idGenerator.getTrackId(), C.TRACK_TYPE_AUDIO);
     currentOutput = output;
-    android.util.Log.d("jianjun", "AdtsReader: currentOutput = " + currentOutput, new Throwable());
+    androidx.media3.common.util.JLog.d("jianjun", "AdtsReader: currentOutput = " + currentOutput, new Throwable());
     if (exposeId3) {
       idGenerator.generateNewId();
       id3Output = extractorOutput.track(idGenerator.getTrackId(), C.TRACK_TYPE_METADATA);
@@ -169,7 +169,7 @@ public final class AdtsReader implements ElementaryStreamReader {
 
   @Override
   public void packetStarted(long pesTimeUs, @TsPayloadReader.Flags int flags) {
-    android.util.Log.d("jianjun", "AdtsReader: packetStarted => pesTimeUs=" + pesTimeUs, new Throwable());
+    androidx.media3.common.util.JLog.d("jianjun", "AdtsReader: packetStarted => pesTimeUs=" + pesTimeUs, new Throwable());
     timeUs = pesTimeUs;
   }
 
@@ -179,28 +179,28 @@ public final class AdtsReader implements ElementaryStreamReader {
     while (data.bytesLeft() > 0) {
       switch (state) {
         case STATE_FINDING_SAMPLE:
-          android.util.Log.d("jianjun", "AdtsReader: STATE_FINDING_SAMPLE");
+          androidx.media3.common.util.JLog.d("jianjun", "AdtsReader: STATE_FINDING_SAMPLE");
           findNextSample(data);
           break;
         case STATE_READING_ID3_HEADER:
-          android.util.Log.d("jianjun", "AdtsReader: STATE_READING_ID3_HEADER");
+          androidx.media3.common.util.JLog.d("jianjun", "AdtsReader: STATE_READING_ID3_HEADER");
           if (continueRead(data, id3HeaderBuffer.getData(), ID3_HEADER_SIZE)) {
             parseId3Header();
           }
           break;
         case STATE_CHECKING_ADTS_HEADER:
-          android.util.Log.d("jianjun", "AdtsReader: STATE_CHECKING_ADTS_HEADER");
+          androidx.media3.common.util.JLog.d("jianjun", "AdtsReader: STATE_CHECKING_ADTS_HEADER");
           checkAdtsHeader(data);
           break;
         case STATE_READING_ADTS_HEADER:
-          android.util.Log.d("jianjun", "AdtsReader: STATE_READING_ADTS_HEADER");
+          androidx.media3.common.util.JLog.d("jianjun", "AdtsReader: STATE_READING_ADTS_HEADER");
           int targetLength = hasCrc ? HEADER_SIZE + CRC_SIZE : HEADER_SIZE;
           if (continueRead(data, adtsScratch.data, targetLength)) {
             parseAdtsHeader();
           }
           break;
         case 4:
-          android.util.Log.d("jianjun", "AdtsReader: STATE_READING_SAMPLE");
+          androidx.media3.common.util.JLog.d("jianjun", "AdtsReader: STATE_READING_SAMPLE");
           readSample(data);
           break;
         default:
@@ -274,11 +274,11 @@ public final class AdtsReader implements ElementaryStreamReader {
     state = STATE_READING_SAMPLE;
     bytesRead = priorReadBytes;
     if (this.currentOutput != outputToUse) {
-      android.util.Log.d("jianjun", "AdtsReader: setReadingSampleState - currentOutput = " + currentOutput + " , currentSampleDuration=" + currentSampleDuration, new Throwable());
+      androidx.media3.common.util.JLog.d("jianjun", "AdtsReader: setReadingSampleState - currentOutput = " + currentOutput + " , currentSampleDuration=" + currentSampleDuration, new Throwable());
     }
     this.currentOutput = outputToUse;
     if (this.currentSampleDuration != currentSampleDuration) {
-      android.util.Log.d("jianjun", "AdtsReader: setReadingSampleState - currentSampleDuration=" + currentSampleDuration, new Throwable());
+      androidx.media3.common.util.JLog.d("jianjun", "AdtsReader: setReadingSampleState - currentSampleDuration=" + currentSampleDuration, new Throwable());
     }
     this.currentSampleDuration = currentSampleDuration;
     this.sampleSize = sampleSize;
@@ -492,7 +492,7 @@ public final class AdtsReader implements ElementaryStreamReader {
   /** Parses the Id3 header. */
   @RequiresNonNull("id3Output")
   private void parseId3Header() {
-    android.util.Log.d("jianjun", "AdtsReader: parseId3Header" , new Throwable());
+    androidx.media3.common.util.JLog.d("jianjun", "AdtsReader: parseId3Header" , new Throwable());
     id3Output.sampleData(id3HeaderBuffer, ID3_HEADER_SIZE);
     id3HeaderBuffer.setPosition(ID3_SIZE_OFFSET);
     setReadingSampleState(
@@ -542,7 +542,8 @@ public final class AdtsReader implements ElementaryStreamReader {
       // In this class a sample is an access unit, but the MediaFormat sample rate specifies the
       // number of PCM audio samples per second.
       sampleDurationUs = (C.MICROS_PER_SECOND * 1024) / format.sampleRate;
-      android.util.Log.d("jianjun", "AdtsReader: parseAdtsHeader - sampleDurationUs=" + sampleDurationUs + ", sampleRate=" + format.sampleRate, new Throwable());
+      androidx.media3.common.util.JLog.d("jianjun", "AdtsReader: parseAdtsHeader - sampleDurationUs=" + sampleDurationUs + ", sampleRate=" + format.sampleRate, new Throwable());
+      //androidx.media3.common.util.JLog.d("jianjun", "AdtsReader: " + format.sampleRate + ", sampleDurationUs: " + sampleDurationUs);
       output.format(format);
       hasOutputFormat = true;
     } else {
@@ -567,7 +568,7 @@ public final class AdtsReader implements ElementaryStreamReader {
     if (bytesRead == sampleSize) {
       // packetStarted method must be called before reading samples.
       checkState(timeUs != C.TIME_UNSET);
-      android.util.Log.d("jianjun", "AdtsReader -- readSample -- timeUs=" + timeUs + ", currentSampleDuration=" + currentSampleDuration + ", dataSize=" + bytesToRead);
+      androidx.media3.common.util.JLog.d("jianjun", "AdtsReader -- readSample -- timeUs=" + timeUs + ", currentSampleDuration=" + currentSampleDuration + ", dataSize=" + bytesToRead);
       currentOutput.sampleMetadata(timeUs, C.BUFFER_FLAG_KEY_FRAME, sampleSize, 0, null);
       timeUs += currentSampleDuration;
       setFindingSampleState();

@@ -555,7 +555,7 @@ public abstract class BaseRenderer implements Renderer, RendererCapabilities {
       FormatHolder formatHolder, DecoderInputBuffer buffer, @ReadFlags int readFlags) {
     @ReadDataResult
     int result = Assertions.checkNotNull(stream).readData(formatHolder, buffer, readFlags);
-    //android.util.Log.d("jianjun", "stream:" + stream.getClass()+ ", readSource result: " + result, new Throwable());
+    //androidx.media3.common.util.JLog.d("jianjun", "stream:" + stream.getClass()+ ", readSource result: " + result, new Throwable());
     if (result == C.RESULT_BUFFER_READ) {
       if (buffer.isEndOfStream()) {
         readingPositionUs = C.TIME_END_OF_SOURCE;

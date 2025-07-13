@@ -20,6 +20,8 @@ import static androidx.media3.common.util.Assertions.checkNotNull;
 
 import android.annotation.SuppressLint;
 import android.media.MediaCodec;
+import android.media.MediaCodecInfo;
+import android.media.MediaCodecList;
 import android.media.MediaFormat;
 import android.os.Bundle;
 import android.os.Handler;
@@ -57,6 +59,7 @@ public final class SynchronousMediaCodecAdapter implements MediaCodecAdapter {
             && Util.SDK_INT >= 35) {
           flags |= MediaCodec.CONFIGURE_FLAG_DETACHED_SURFACE;
         }
+        androidx.media3.common.util.JLog.i("jianjun", "createAdapter: createCodec");
         codec.configure(
             configuration.mediaFormat, configuration.surface, configuration.crypto, flags);
         TraceUtil.endSection();

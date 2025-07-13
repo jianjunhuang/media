@@ -47,7 +47,9 @@ import java.util.List;
 import org.checkerframework.checker.nullness.qual.EnsuresNonNull;
 import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
-/** A utility class for querying the available codecs. */
+/**
+ * A utility class for querying the available codecs.
+ */
 @SuppressLint("InlinedApi")
 @UnstableApi
 public final class MediaCodecUtil {
@@ -73,7 +75,8 @@ public final class MediaCodecUtil {
   // Lazily initialized.
   private static int maxH264DecodableFrameSize = -1;
 
-  private MediaCodecUtil() {}
+  private MediaCodecUtil() {
+  }
 
   /**
    * Optional call to warm the codec cache for a given MIME type.
@@ -81,11 +84,11 @@ public final class MediaCodecUtil {
    * <p>Calling this method may speed up subsequent calls to {@link #getDecoderInfo(String, boolean,
    * boolean)} and {@link #getDecoderInfos(String, boolean, boolean)}.
    *
-   * @param mimeType The MIME type.
-   * @param secure Whether the decoder is required to support secure decryption. Always pass false
-   *     unless secure decryption really is required.
+   * @param mimeType  The MIME type.
+   * @param secure    Whether the decoder is required to support secure decryption. Always pass false
+   *                  unless secure decryption really is required.
    * @param tunneling Whether the decoder is required to support tunneling. Always pass false unless
-   *     tunneling really is required.
+   *                  tunneling really is required.
    */
   public static void warmDecoderInfoCache(String mimeType, boolean secure, boolean tunneling) {
     try {
@@ -116,11 +119,11 @@ public final class MediaCodecUtil {
   /**
    * Returns information about the preferred decoder for a given MIME type.
    *
-   * @param mimeType The MIME type.
-   * @param secure Whether the decoder is required to support secure decryption. Always pass false
-   *     unless secure decryption really is required.
+   * @param mimeType  The MIME type.
+   * @param secure    Whether the decoder is required to support secure decryption. Always pass false
+   *                  unless secure decryption really is required.
    * @param tunneling Whether the decoder is required to support tunneling. Always pass false unless
-   *     tunneling really is required.
+   *                  tunneling really is required.
    * @return A {@link MediaCodecInfo} describing the decoder, or null if no suitable decoder exists.
    * @throws DecoderQueryException If there was an error querying the available decoders.
    */
@@ -135,13 +138,13 @@ public final class MediaCodecUtil {
    * Returns all {@link MediaCodecInfo}s for the given MIME type, in the order given by {@link
    * MediaCodecList}.
    *
-   * @param mimeType The MIME type.
-   * @param secure Whether the decoder is required to support secure decryption. Always pass false
-   *     unless secure decryption really is required.
+   * @param mimeType  The MIME type.
+   * @param secure    Whether the decoder is required to support secure decryption. Always pass false
+   *                  unless secure decryption really is required.
    * @param tunneling Whether the decoder is required to support tunneling. Always pass false unless
-   *     tunneling really is required.
+   *                  tunneling really is required.
    * @return An unmodifiable list of all {@link MediaCodecInfo}s for the given MIME type, in the
-   *     order given by {@link MediaCodecList}.
+   * order given by {@link MediaCodecList}.
    * @throws DecoderQueryException If there was an error querying the available decoders.
    */
   public static synchronized List<MediaCodecInfo> getDecoderInfos(
@@ -175,6 +178,14 @@ public final class MediaCodecUtil {
     applyWorkarounds(mimeType, decoderInfos);
     ImmutableList<MediaCodecInfo> immutableDecoderInfos = ImmutableList.copyOf(decoderInfos);
     decoderInfosCache.put(key, immutableDecoderInfos);
+    for (int i = 0; i < decoderInfos.size(); i++) {
+      android.util.Log.i(TAG, "getDecoderInfos: " + decoderInfos.get(i).name
+          + ", secure=" + decoderInfos.get(i).secure
+          + ", tunneling=" + decoderInfos.get(i).tunneling
+          + ", softwareOnly=" + decoderInfos.get(i).softwareOnly
+          + ", vendor=" + decoderInfos.get(i).vendor
+          + ", mimeType=" + decoderInfos.get(i).mimeType);
+    }
     return immutableDecoderInfos;
   }
 
@@ -191,9 +202,9 @@ public final class MediaCodecUtil {
    * <p>This list is more complete than {@link #getDecoderInfos}, as it also considers alternative
    * MIME types that are a close match using {@link #getAlternativeCodecMimeType}.
    *
-   * @param mediaCodecSelector The decoder selector.
-   * @param format The {@link Format} for which a decoder is required.
-   * @param requiresSecureDecoder Whether a secure decoder is required.
+   * @param mediaCodecSelector       The decoder selector.
+   * @param format                   The {@link Format} for which a decoder is required.
+   * @param requiresSecureDecoder    Whether a secure decoder is required.
    * @param requiresTunnelingDecoder Whether a tunneling decoder is required.
    * @return A list of {@link MediaCodecInfo}s corresponding to decoders. May be empty.
    * @throws DecoderQueryException Thrown if there was an error querying decoders.
@@ -228,9 +239,9 @@ public final class MediaCodecUtil {
    * #getDecoderInfosSortedByFormatSupport} can be used to further sort the list into an order where
    * decoders that fully support the format come first.
    *
-   * @param mediaCodecSelector The decoder selector.
-   * @param format The {@link Format} for which an alternative decoder is required.
-   * @param requiresSecureDecoder Whether a secure decoder is required.
+   * @param mediaCodecSelector       The decoder selector.
+   * @param format                   The {@link Format} for which an alternative decoder is required.
+   * @param requiresSecureDecoder    Whether a secure decoder is required.
    * @param requiresTunnelingDecoder Whether a tunneling decoder is required.
    * @return A list of {@link MediaCodecInfo}s corresponding to alternative decoders. May be empty.
    * @throws DecoderQueryException Thrown if there was an error querying decoders.
@@ -340,7 +351,7 @@ public final class MediaCodecUtil {
    *
    * @param format Media format with codec specific initialization data.
    * @return A pair (profile constant, level constant) if the initializationData of the {@code
-   *     format} is well-formed and recognized, or null otherwise.
+   * format} is well-formed and recognized, or null otherwise.
    */
   @Nullable
   public static Pair<Integer, Integer> getHevcBaseLayerCodecProfileAndLevel(Format format) {
@@ -358,8 +369,8 @@ public final class MediaCodecUtil {
    *
    * @param format The media format.
    * @return An alternative MIME type of a codec that be used decode samples of the provided {@code
-   *     Format} (besides the default {@link Format#sampleMimeType}), or null if no such alternative
-   *     exists.
+   * Format} (besides the default {@link Format#sampleMimeType}), or null if no such alternative
+   * exists.
    */
   @Nullable
   public static String getAlternativeCodecMimeType(Format format) {
@@ -398,7 +409,7 @@ public final class MediaCodecUtil {
    * Returns {@link MediaCodecInfo}s for the given codec {@link CodecKey} in the order given by
    * {@code mediaCodecList}.
    *
-   * @param key The codec key.
+   * @param key            The codec key.
    * @param mediaCodecList The codec list.
    * @return The codec information for usable codecs matching the specified key.
    * @throws DecoderQueryException If there was an error querying the available decoders.
@@ -501,12 +512,12 @@ public final class MediaCodecUtil {
    * Returns the codec's supported MIME type for media of type {@code mimeType}, or {@code null} if
    * the codec can't be used.
    *
-   * @param info The codec information.
-   * @param name The name of the codec
+   * @param info     The codec information.
+   * @param name     The name of the codec
    * @param mimeType The MIME type.
    * @return The codec's supported MIME type for media of type {@code mimeType}, or {@code null} if
-   *     the codec can't be used. If non-null, the returned type will be equal to {@code mimeType}
-   *     except in cases where the codec is known to use a non-standard MIME type alias.
+   * the codec can't be used. If non-null, the returned type will be equal to {@code mimeType}
+   * except in cases where the codec is known to use a non-standard MIME type alias.
    */
   @Nullable
   private static String getCodecMimeType(
@@ -546,10 +557,10 @@ public final class MediaCodecUtil {
   /**
    * Returns whether the specified codec is usable for decoding on the current device.
    *
-   * @param info The codec information.
-   * @param name The name of the codec
+   * @param info                   The codec information.
+   * @param name                   The name of the codec
    * @param secureDecodersExplicit Whether secure decoders were explicitly listed, if present.
-   * @param mimeType The MIME type.
+   * @param mimeType               The MIME type.
    * @return Whether the specified codec is usable for decoding on the current device.
    */
   private static boolean isCodecUsableDecoder(
@@ -566,13 +577,13 @@ public final class MediaCodecUtil {
         && ("OMX.SEC.aac.dec".equals(name) || "OMX.Exynos.AAC.Decoder".equals(name))
         && "samsung".equals(Build.MANUFACTURER)
         && (Build.DEVICE.startsWith("zeroflte") // Galaxy S6
-            || Build.DEVICE.startsWith("zerolte") // Galaxy S6 Edge
-            || Build.DEVICE.startsWith("zenlte") // Galaxy S6 Edge+
-            || "SC-05G".equals(Build.DEVICE) // Galaxy S6
-            || "marinelteatt".equals(Build.DEVICE) // Galaxy S6 Active
-            || "404SC".equals(Build.DEVICE) // Galaxy S6 Edge
-            || "SC-04G".equals(Build.DEVICE)
-            || "SCV31".equals(Build.DEVICE))) {
+        || Build.DEVICE.startsWith("zerolte") // Galaxy S6 Edge
+        || Build.DEVICE.startsWith("zenlte") // Galaxy S6 Edge+
+        || "SC-05G".equals(Build.DEVICE) // Galaxy S6
+        || "marinelteatt".equals(Build.DEVICE) // Galaxy S6 Active
+        || "404SC".equals(Build.DEVICE) // Galaxy S6 Edge
+        || "SC-04G".equals(Build.DEVICE)
+        || "SCV31".equals(Build.DEVICE))) {
       return false;
     }
 
@@ -590,7 +601,7 @@ public final class MediaCodecUtil {
    * Modifies a list of {@link MediaCodecInfo}s to apply workarounds where we know better than the
    * platform.
    *
-   * @param mimeType The MIME type of input media.
+   * @param mimeType     The MIME type of input media.
    * @param decoderInfos The list to modify.
    */
   private static void applyWorkarounds(String mimeType, List<MediaCodecInfo> decoderInfos) {
@@ -724,7 +735,7 @@ public final class MediaCodecUtil {
    *
    * @param avcLevel One of the {@link CodecProfileLevel} {@code AVCLevel*} constants.
    * @return The maximum frame size that can be decoded by a decoder with the specified AVC level,
-   *     or {@code -1} if the level is not recognized.
+   * or {@code -1} if the level is not recognized.
    */
   private static int avcLevelToMaxFrameSize(int avcLevel) {
     switch (avcLevel) {
@@ -763,20 +774,29 @@ public final class MediaCodecUtil {
     }
   }
 
-  /** Stably sorts the provided {@code list} in-place, in order of decreasing score. */
+  /**
+   * Stably sorts the provided {@code list} in-place, in order of decreasing score.
+   */
   private static <T> void sortByScore(List<T> list, ScoreProvider<T> scoreProvider) {
     Collections.sort(list, (a, b) -> scoreProvider.getScore(b) - scoreProvider.getScore(a));
   }
 
-  /** Interface for providers of item scores. */
+  /**
+   * Interface for providers of item scores.
+   */
   private interface ScoreProvider<T> {
-    /** Returns the score of the provided item. */
+
+    /**
+     * Returns the score of the provided item.
+     */
     int getScore(T t);
   }
 
   private interface MediaCodecListCompat {
 
-    /** The number of codecs in the list. */
+    /**
+     * The number of codecs in the list.
+     */
     int getCodecCount();
 
     /**
@@ -786,13 +806,19 @@ public final class MediaCodecUtil {
      */
     android.media.MediaCodecInfo getCodecInfoAt(int index);
 
-    /** Returns whether secure decoders are explicitly listed, if present. */
+    /**
+     * Returns whether secure decoders are explicitly listed, if present.
+     */
     boolean secureDecodersExplicit();
 
-    /** Whether the specified {@link CodecCapabilities} {@code feature} is supported. */
+    /**
+     * Whether the specified {@link CodecCapabilities} {@code feature} is supported.
+     */
     boolean isFeatureSupported(String feature, String mimeType, CodecCapabilities capabilities);
 
-    /** Whether the specified {@link CodecCapabilities} {@code feature} is required. */
+    /**
+     * Whether the specified {@link CodecCapabilities} {@code feature} is required.
+     */
     boolean isFeatureRequired(String feature, String mimeType, CodecCapabilities capabilities);
   }
 
@@ -800,7 +826,8 @@ public final class MediaCodecUtil {
 
     private final int codecKind;
 
-    @Nullable private android.media.MediaCodecInfo[] mediaCodecInfos;
+    @Nullable
+    private android.media.MediaCodecInfo[] mediaCodecInfos;
 
     public MediaCodecListCompatV21(
         boolean includeSecure, boolean includeTunneling, boolean includeSpecialCodec) {

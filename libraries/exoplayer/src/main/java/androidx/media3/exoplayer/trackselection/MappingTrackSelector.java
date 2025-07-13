@@ -504,7 +504,7 @@ public abstract class MappingTrackSelector extends TrackSelector {
       boolean preferUnassociatedRenderer)
       throws ExoPlaybackException {
     int bestRendererIndex = rendererCapabilities.length;
-    android.util.Log.d("jianjun", "findRenderer: group=" + group);
+//    android.util.Log.d("jianjun", "findRenderer: group=" + group);
     @FormatSupport int bestFormatSupportLevel = C.FORMAT_UNSUPPORTED_TYPE;
     boolean bestRendererIsUnassociated = true;
     for (int rendererIndex = 0; rendererIndex < rendererCapabilities.length; rendererIndex++) {

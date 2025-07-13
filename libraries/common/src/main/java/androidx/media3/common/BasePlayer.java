@@ -430,13 +430,10 @@ public abstract class BasePlayer implements Player {
 
   @Override
   public final long getContentDuration() {
-    android.util.Log.d("jianjun", "getContentDuration", new Throwable());
     Timeline timeline = getCurrentTimeline();
     long duration = timeline.isEmpty()
         ? C.TIME_UNSET
         : timeline.getWindow(getCurrentMediaItemIndex(), window).getDurationMs();
-    android.util.Log.d("jianjun", "getContentDuration, " + duration + ", int:" + (int) duration,
-        new Throwable());
     return duration;
   }
 

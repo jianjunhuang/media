@@ -153,7 +153,7 @@ public final class DefaultMediaCodecAdapterFactory implements MediaCodecAdapter.
       Log.i(
           TAG,
           "Creating an asynchronous MediaCodec adapter for track type "
-              + Util.getTrackTypeString(trackType));
+              + Util.getTrackTypeString(trackType), new Throwable());
       AsynchronousMediaCodecAdapter.Factory factory =
           callbackThreadSupplier != null && queueingThreadSupplier != null
               ? new AsynchronousMediaCodecAdapter.Factory(

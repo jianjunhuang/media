@@ -104,7 +104,7 @@ public final class FfmpegAudioRenderer extends DecoderAudioRenderer<FfmpegAudioD
     } else if (!FfmpegLibrary.supportsFormat(mimeType)
         || (!sinkSupportsFormat(format, C.ENCODING_PCM_16BIT)
         && !sinkSupportsFormat(format, C.ENCODING_PCM_FLOAT))) {
-      android.util.Log.d("jianjun", "supportsFormatInternal: " + format
+      androidx.media3.common.util.JLog.d("jianjun", "supportsFormatInternal: " + format
               + ", supportsFormat: " + FfmpegLibrary.supportsFormat(mimeType)
               + ", sinkSupportsFormat: " + sinkSupportsFormat(format, C.ENCODING_PCM_16BIT)
               + ", sinkSupportsFormat: " + sinkSupportsFormat(format, C.ENCODING_PCM_FLOAT)

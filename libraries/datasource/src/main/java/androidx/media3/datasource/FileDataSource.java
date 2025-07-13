@@ -119,6 +119,7 @@ public final class FileDataSource extends BaseDataSource {
       throw new FileDataSourceException(e, PlaybackException.ERROR_CODE_IO_UNSPECIFIED);
     }
     if (bytesRemaining < 0) {
+      androidx.media3.common.util.JLog.e("jianjun", "bytesRemaining < 0", new RuntimeException());
       throw new FileDataSourceException(
           /* message= */ null,
           /* cause= */ null,

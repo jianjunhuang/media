@@ -124,7 +124,7 @@ import com.google.common.collect.ImmutableList;
 
   @Nullable
   private static String getMimeTypeFromCompression(int compression) {
-    android.util.Log.d("jianjun", "getMimeTypeFromCompression: " + Integer.toHexString(compression));
+    androidx.media3.common.util.JLog.d("jianjun", "getMimeTypeFromCompression: " + Integer.toHexString(compression));
     switch (compression) {
       case 0x3234504d: // MP42
         return MimeTypes.VIDEO_MP42;

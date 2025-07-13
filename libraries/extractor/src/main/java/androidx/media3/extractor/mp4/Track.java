@@ -115,6 +115,11 @@ public final class Track {
     this.nalUnitLengthFieldLength = nalUnitLengthFieldLength;
     this.editListDurations = editListDurations;
     this.editListMediaTimes = editListMediaTimes;
+//    android.util.Log.d("jianjun", "Track: id=" + id + ", type=" + type + ", timescale=" + timescale
+//        + ", movieTimescale=" + movieTimescale + ", durationUs=" + durationUs
+//        + ", mediaDurationUs=" + mediaDurationUs + ", format=" + format
+//        + ", sampleTransformation=" + sampleTransformation
+//        + ", nalUnitLengthFieldLength=" + nalUnitLengthFieldLength, new Throwable());
   }
 
   /**

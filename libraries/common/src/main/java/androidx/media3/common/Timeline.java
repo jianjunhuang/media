@@ -295,7 +295,7 @@ public abstract class Timeline {
       this.defaultPositionUs = defaultPositionUs;
       this.durationUs = durationUs;
       if (durationUs >= 0) {
-        //android.util.Log.d("jianjun", "Timeline: setDurationUs: " + durationUs, new Throwable());
+        //androidx.media3.common.util.JLog.d("jianjun", "Timeline: setDurationUs: " + durationUs, new Throwable());
       }
       this.firstPeriodIndex = firstPeriodIndex;
       this.lastPeriodIndex = lastPeriodIndex;
@@ -509,7 +509,7 @@ public abstract class Timeline {
       boolean isPlaceHolder = bundle.getBoolean(FIELD_IS_PLACEHOLDER, /* defaultValue= */ false);
       long defaultPositionUs = bundle.getLong(FIELD_DEFAULT_POSITION_US, /* defaultValue= */ 0);
       long durationUs = bundle.getLong(FIELD_DURATION_US, /* defaultValue= */ C.TIME_UNSET);
-      android.util.Log.d("jianjun", "Timeline: setDurationUs: " + durationUs, new Throwable());
+      androidx.media3.common.util.JLog.d("jianjun", "Timeline: setDurationUs: " + durationUs, new Throwable());
       int firstPeriodIndex = bundle.getInt(FIELD_FIRST_PERIOD_INDEX, /* defaultValue= */ 0);
       int lastPeriodIndex = bundle.getInt(FIELD_LAST_PERIOD_INDEX, /* defaultValue= */ 0);
       long positionInFirstPeriodUs =
@@ -611,6 +611,7 @@ public abstract class Timeline {
         int windowIndex,
         long durationUs,
         long positionInWindowUs) {
+//      androidx.media3.common.util.JLog.d("jianjun", "setTimeline: " + durationUs, new Throwable());
       return set(
           id,
           uid,
@@ -650,6 +651,7 @@ public abstract class Timeline {
         long positionInWindowUs,
         AdPlaybackState adPlaybackState,
         boolean isPlaceholder) {
+//      androidx.media3.common.util.JLog.d("jianjun", "setTimeline: " + durationUs, new Throwable());
       this.id = id;
       this.uid = uid;
       this.windowIndex = windowIndex;
@@ -936,7 +938,7 @@ public abstract class Timeline {
     public static Period fromBundle(Bundle bundle) {
       int windowIndex = bundle.getInt(FIELD_WINDOW_INDEX, /* defaultValue= */ 0);
       long durationUs = bundle.getLong(FIELD_DURATION_US, /* defaultValue= */ C.TIME_UNSET);
-      android.util.Log.d("jianjun", "Timeline: setDurationUs fromBundle: " + durationUs, new Throwable());
+      androidx.media3.common.util.JLog.d("jianjun", "Timeline: setDurationUs fromBundle: " + durationUs, new Throwable());
       long positionInWindowUs = bundle.getLong(FIELD_POSITION_IN_WINDOW_US, /* defaultValue= */ 0);
       boolean isPlaceholder = bundle.getBoolean(FIELD_PLACEHOLDER, /* defaultValue= */ false);
       @Nullable Bundle adPlaybackStateBundle = bundle.getBundle(FIELD_AD_PLAYBACK_STATE);

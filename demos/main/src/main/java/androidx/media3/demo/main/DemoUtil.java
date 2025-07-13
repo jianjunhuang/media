@@ -50,7 +50,9 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.chromium.net.CronetEngine;
 
-/** Utility methods for the demo app. */
+/**
+ * Utility methods for the demo app.
+ */
 public final class DemoUtil {
 
   public static final String DOWNLOAD_NOTIFICATION_CHANNEL_ID = "download_channel";
@@ -77,7 +79,9 @@ public final class DemoUtil {
   @OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
   private static @MonotonicNonNull DownloadNotificationHelper downloadNotificationHelper;
 
-  /** Returns whether extension renderers should be used. */
+  /**
+   * Returns whether extension renderers should be used.
+   */
   public static boolean useExtensionRenderers() {
     return BuildConfig.USE_DECODER_EXTENSIONS;
   }
@@ -89,8 +93,8 @@ public final class DemoUtil {
     int extensionRendererMode =
         useExtensionRenderers()
             ? (preferExtensionRenderer
-                ? DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
-                : DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+            ? DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
+            : DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
             : DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF;
     return new DefaultRenderersFactory(context.getApplicationContext())
         .setMediaCodecSelector(new MediaCodecSelector() {
@@ -99,8 +103,10 @@ public final class DemoUtil {
               boolean requiresSecureDecoder, boolean requiresTunnelingDecoder)
               throws MediaCodecUtil.DecoderQueryException {
 
-            android.util.Log.d("jianjun", "getDecoderInfos: " + mimeType, new Throwable());
-            return  MediaCodecSelector.DEFAULT.getDecoderInfos(
+            androidx.media3.common.util.JLog.d("jianjun",
+                "getDecoderInfos: " + mimeType + ", requiresSecureDecoder: " + requiresSecureDecoder
+                    + ", requiresTunnelingDecoder: " + requiresTunnelingDecoder, new Throwable());
+            return MediaCodecSelector.DEFAULT.getDecoderInfos(
                 mimeType,
                 requiresSecureDecoder,
                 requiresTunnelingDecoder
@@ -137,7 +143,9 @@ public final class DemoUtil {
     return httpDataSourceFactory;
   }
 
-  /** Returns a {@link DataSource.Factory}. */
+  /**
+   * Returns a {@link DataSource.Factory}.
+   */
   public static synchronized DataSource.Factory getDataSourceFactory(Context context) {
     if (dataSourceFactory == null) {
       context = context.getApplicationContext();
@@ -224,5 +232,6 @@ public final class DemoUtil {
         .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR);
   }
 
-  private DemoUtil() {}
+  private DemoUtil() {
+  }
 }

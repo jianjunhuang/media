@@ -1091,7 +1091,7 @@ import java.util.concurrent.CopyOnWriteArraySet;
 
   @Override
   public long getDuration() {
-    android.util.Log.i("jianjun", "getDuration", new Throwable());
+//    androidx.media3.common.util.JLog.i("jianjun", "getDuration", new Throwable());
     verifyApplicationThread();
     if (isPlayingAd()) {
       MediaPeriodId periodId = playbackInfo.periodId;

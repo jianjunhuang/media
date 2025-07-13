@@ -332,7 +332,7 @@ public final class TsExtractor implements Extractor {
     this.mode = mode;
     this.extractorFlags = extractorFlags;
     this.subtitleParserFactory = subtitleParserFactory;
-    android.util.Log.d("jianjun", "TsExtractor->mode: " + mode, new Throwable());
+//    androidx.media3.common.util.JLog.d("jianjun", "TsExtractor->mode: " + mode, new Throwable());
     if (mode == MODE_SINGLE_PMT || mode == MODE_HLS) {
       timestampAdjusters = Collections.singletonList(timestampAdjuster);
     } else {
@@ -669,7 +669,7 @@ public final class TsExtractor implements Extractor {
         } else {
           int pid = patScratch.readBits(13);
           if (tsPayloadReaders.get(pid) == null) {
-            android.util.Log.d("jianjun", "TsExtractor->pid: " + pid);
+//            androidx.media3.common.util.JLog.d("jianjun", "TsExtractor->pid: " + pid);
             tsPayloadReaders.put(pid, new SectionReader(new PmtReader(pid)));
             remainingPmts++;
           }
@@ -793,7 +793,7 @@ public final class TsExtractor implements Extractor {
         remainingEntriesLength -= esInfoLength + 5;
 
         int trackId = mode == MODE_HLS ? streamType : elementaryPid;
-        android.util.Log.d("jianjun", "TsExtractor->trackId: " + trackId);
+//        androidx.media3.common.util.JLog.d("jianjun", "TsExtractor->trackId: " + trackId);
         if (trackIds.get(trackId)) {
           continue;
         }
@@ -804,25 +804,25 @@ public final class TsExtractor implements Extractor {
                 ? id3Reader
                 : payloadReaderFactory.createPayloadReader(streamType, esInfo);
 
-        android.util.Log.d("jianjun", "TsExtractor-> streamType: " + streamType + ", reader: " + reader);
+//        androidx.media3.common.util.JLog.d("jianjun", "TsExtractor-> streamType: " + streamType + ", reader: " + reader);
 
         if (mode != MODE_HLS
             || elementaryPid < trackIdToPidScratch.get(trackId, MAX_PID_PLUS_ONE)) {
-          android.util.Log.d("jianjun", "TsExtractor-> trackId: " + trackId + ", elementaryPid: " + elementaryPid);
+//          androidx.media3.common.util.JLog.d("jianjun", "TsExtractor-> trackId: " + trackId + ", elementaryPid: " + elementaryPid);
           trackIdToPidScratch.put(trackId, elementaryPid);
           trackIdToReaderScratch.put(trackId, reader);
         }
       }
 
       int trackIdCount = trackIdToPidScratch.size();
-      android.util.Log.d("jianjun", "TsExtractor->trackIdCount: " + trackIdCount);
+//      androidx.media3.common.util.JLog.d("jianjun", "TsExtractor->trackIdCount: " + trackIdCount);
       for (int i = 0; i < trackIdCount; i++) {
         int trackId = trackIdToPidScratch.keyAt(i);
         int trackPid = trackIdToPidScratch.valueAt(i);
         trackIds.put(trackId, true);
         trackPids.put(trackPid, true);
         @Nullable TsPayloadReader reader = trackIdToReaderScratch.valueAt(i);
-        android.util.Log.d("jianjun", "TsExtractor->trackId: " + trackId + ", trackPid: " + trackPid + ", reader: " + reader);
+//        androidx.media3.common.util.JLog.d("jianjun", "TsExtractor->trackId: " + trackId + ", trackPid: " + trackPid + ", reader: " + reader);
         if (reader != null) {
           if (reader != id3Reader) {
             reader.init(
@@ -836,7 +836,7 @@ public final class TsExtractor implements Extractor {
 
       if (mode == MODE_HLS) {
         if (!tracksEnded) {
-          android.util.Log.d("jianjun", "TsExtractor->MODE_HLS: " + remainingPmts);
+//          androidx.media3.common.util.JLog.d("jianjun", "TsExtractor->MODE_HLS: " + remainingPmts);
           output.endTracks();
           remainingPmts = 0;
           tracksEnded = true;
@@ -844,9 +844,9 @@ public final class TsExtractor implements Extractor {
       } else {
         tsPayloadReaders.remove(pid);
         remainingPmts = mode == MODE_SINGLE_PMT ? 0 : remainingPmts - 1;
-        android.util.Log.d("jianjun", "TsExtractor->mode: " + mode);
+//        androidx.media3.common.util.JLog.d("jianjun", "TsExtractor->mode: " + mode);
         if (remainingPmts == 0) {
-          android.util.Log.d("jianjun", "TsExtractor->remainingPmts: " + remainingPmts);
+//          androidx.media3.common.util.JLog.d("jianjun", "TsExtractor->remainingPmts: " + remainingPmts);
           output.endTracks();
           tracksEnded = true;
         }

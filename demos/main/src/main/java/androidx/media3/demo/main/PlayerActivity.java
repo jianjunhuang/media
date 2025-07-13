@@ -34,10 +34,13 @@ import androidx.media3.common.AudioAttributes;
 import androidx.media3.common.C;
 import androidx.media3.common.ErrorMessageProvider;
 import androidx.media3.common.MediaItem;
+import androidx.media3.common.MediaMetadata;
+import androidx.media3.common.Metadata;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.common.TrackSelectionParameters;
 import androidx.media3.common.Tracks;
+import androidx.media3.common.util.JLog;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
 import androidx.media3.datasource.DataSource;
@@ -337,7 +340,7 @@ public class PlayerActivity extends AppCompatActivity
   @OptIn(markerClass = UnstableApi.class)
   private void setRenderersFactory(
       ExoPlayer.Builder playerBuilder, boolean preferExtensionDecoders) {
-    android.util.Log.d("jianjun", "setRenderersFactory: " + preferExtensionDecoders);
+    JLog.d("setRenderersFactory: " + preferExtensionDecoders);
     RenderersFactory renderersFactory =
         DemoUtil.buildRenderersFactory(/* context= */ this, preferExtensionDecoders);
     playerBuilder.setRenderersFactory(renderersFactory);
@@ -481,7 +484,7 @@ public class PlayerActivity extends AppCompatActivity
     @Override
     public void onTrackSelectionParametersChanged(TrackSelectionParameters parameters) {
       Player.Listener.super.onTrackSelectionParametersChanged(parameters);
-      android.util.Log.d("jianjun", "PlayerActivity->onTrackSelectionParametersChanged: " + parameters);
+      JLog.d("PlayerActivity->onTrackSelectionParametersChanged: " + parameters);
     }
 
     @Override
@@ -489,7 +492,7 @@ public class PlayerActivity extends AppCompatActivity
       if (playbackState == Player.STATE_ENDED) {
         showControls();
       } else if (playbackState == Player.STATE_READY) {
-        android.util.Log.d("jianjun", "PlayerActivity->onPlaybackStateChanged: STATE_READY");
+        JLog.d("PlayerActivity->onPlaybackStateChanged: STATE_READY");
       }
       updateButtonVisibility();
     }
@@ -508,13 +511,13 @@ public class PlayerActivity extends AppCompatActivity
     @Override
     @SuppressWarnings("ReferenceEquality")
     public void onTracksChanged(Tracks tracks) {
-      android.util.Log.d("jianjun", "PlayerActivity->onTracksChanged: " + tracks, new Throwable());
-
+      JLog.d("PlayerActivity->onTracksChanged: " + tracks, new Throwable());
       List<Tracks.Group> groups = tracks.getGroups();
       for (int i = 0; i < groups.size(); i++) {
         Tracks.Group group = groups.get(i);
         for (int j = 0; j < group.length; j++) {
-          android.util.Log.d("jianjun", "PlayerActivity->onTracksChanged: " + group.getTrackFormat(j));
+          androidx.media3.common.util.JLog.d("jianjun", "PlayerActivity->onTracksChanged: " + group.getTrackFormat(j));
+          androidx.media3.common.util.JLog.d("jianjun", "PlayerActivity->onTracksChanged: " + group.getTrackFormat(j).metadata);
         }
       }
       updateButtonVisibility();
@@ -530,6 +533,18 @@ public class PlayerActivity extends AppCompatActivity
         showToast(R.string.error_unsupported_audio);
       }
       lastSeenTracks = tracks;
+    }
+
+    @Override
+    public void onMediaMetadataChanged(MediaMetadata mediaMetadata) {
+      Player.Listener.super.onMediaMetadataChanged(mediaMetadata);
+      androidx.media3.common.util.JLog.d("jianjun", "PlayerActivity -> onMediaMetadataChanged: " + mediaMetadata);
+    }
+
+    @Override
+    public void onMetadata(Metadata metadata) {
+      Player.Listener.super.onMetadata(metadata);
+      androidx.media3.common.util.JLog.d("jianjun", "PlayerActivity -> onMetadata: " + metadata);
     }
   }
 

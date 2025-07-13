@@ -352,6 +352,13 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
     if (!supportsFormatDrm) {
       return RendererCapabilities.create(C.FORMAT_UNSUPPORTED_DRM);
     }
+
+    for (int i = 0; i < decoderInfos.size(); i++) {
+      MediaCodecInfo info = decoderInfos.get(i);
+      android.util.Log.d(TAG, "DecoderInfo(" + info.name + ")" +
+          " supportsFormat: " + info.isFormatSupported(format) + ", isHardwareAccelerated: " + info.hardwareAccelerated);
+    }
+
     // Check whether the first decoder supports the format. This is the preferred decoder for the
     // format's MIME type, according to the MediaCodecSelector.
     MediaCodecInfo decoderInfo = decoderInfos.get(0);

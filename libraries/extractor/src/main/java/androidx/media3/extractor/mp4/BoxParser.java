@@ -1138,7 +1138,7 @@ public final class BoxParser {
           || childAtomType == Mp4Box.TYPE_Opus
           || childAtomType == Mp4Box.TYPE_fLaC
           || childAtomType == Mp4Box.TYPE_iamf) {
-        android.util.Log.d("jianjun", "parseStsd: childAtomType = " + childAtomType);
+        androidx.media3.common.util.JLog.d("jianjun", "parseStsd: childAtomType = " + childAtomType);
         parseAudioSampleEntry(
             stsd,
             childAtomType,

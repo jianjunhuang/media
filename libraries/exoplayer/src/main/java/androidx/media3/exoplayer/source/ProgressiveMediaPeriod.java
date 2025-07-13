@@ -219,13 +219,13 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
             : new Loader("ProgressiveMediaPeriod");
     this.progressiveMediaExtractor = progressiveMediaExtractor;
     this.singleSampleDurationUs = singleSampleDurationUs;
-    android.util.Log.d("jianjun", "ProgressiveMediaPeriod: singleSampleDurationUs=" + singleSampleDurationUs, new Throwable());
+    androidx.media3.common.util.JLog.d("jianjun", "ProgressiveMediaPeriod: singleSampleDurationUs=" + singleSampleDurationUs, new Throwable());
     loadCondition = new ConditionVariable();
     maybeFinishPrepareRunnable = this::maybeFinishPrepare;
     onContinueLoadingRequestedRunnable =
         () -> {
           if (!released) {
-            android.util.Log.d("jianjun", "ProgressiveMediaPeriod: onContinueLoadingRequestedRunnable - callback="+callback);
+            //androidx.media3.common.util.JLog.d("jianjun", "ProgressiveMediaPeriod: onContinueLoadingRequestedRunnable - callback="+callback);
             checkNotNull(callback).onContinueLoadingRequested(ProgressiveMediaPeriod.this);
           }
         };
@@ -275,7 +275,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
       endTracks();
       pendingResetPositionUs = positionUs;
     } else {
-      android.util.Log.d("jianjun", "ProgressiveMediaExtractor: prepare - loadCondition.open");
+      androidx.media3.common.util.JLog.d("jianjun", "ProgressiveMediaExtractor: prepare - loadCondition.open");
       loadCondition.open();
       startLoading();
     }
@@ -407,7 +407,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
       return false;
     }
     boolean continuedLoading = loadCondition.open();
-    android.util.Log.d("jianjun", "ProgressiveMediaExtractor: continueLoading - loadCondition.open", new Throwable());
+    //androidx.media3.common.util.JLog.d("jianjun", "ProgressiveMediaExtractor: continueLoading - loadCondition.open", new Throwable());
     if (!loader.isLoading()) {
       startLoading();
       continuedLoading = true;
@@ -647,10 +647,10 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
           largestQueuedTimestampUs == Long.MIN_VALUE
               ? 0
               : largestQueuedTimestampUs + DEFAULT_LAST_SAMPLE_DURATION_US;
-      android.util.Log.d("jianjun", "ProgressiveMediaPeriod: onLoadCompleted = " + durationUs + ", " + largestQueuedTimestampUs , new Throwable());
+      androidx.media3.common.util.JLog.d("jianjun", "ProgressiveMediaPeriod: onLoadCompleted = " + durationUs + ", " + largestQueuedTimestampUs , new Throwable());
       listener.onSourceInfoRefreshed(durationUs, seekMap, isLive);
     }
-    android.util.Log.d("jianjun", "ProgressiveMediaPeriod: onLoadCompleted = " + durationUs + ", " + seekMap, new Throwable());
+    androidx.media3.common.util.JLog.d("jianjun", "ProgressiveMediaPeriod: onLoadCompleted = " + durationUs + ", " + seekMap, new Throwable());
     StatsDataSource dataSource = loadable.dataSource;
     LoadEventInfo loadEventInfo =
         new LoadEventInfo(
@@ -776,7 +776,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
   @Override
   public void endTracks() {
-    android.util.Log.d("jianjun", "ProgressiveMediaPeriod->endTracks", new Throwable());
+//    androidx.media3.common.util.JLog.d("jianjun", "ProgressiveMediaPeriod->endTracks", new Throwable());
     sampleQueuesBuilt = true;
     handler.post(maybeFinishPrepareRunnable);
   }
@@ -796,7 +796,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
   @Override
   public void onUpstreamFormatChanged(Format format) {
-    android.util.Log.d("jianjun", "ProgressiveMediaPeriod->onUpstreamFormatChanged: " + format, new Throwable());
+//    androidx.media3.common.util.JLog.d("jianjun", "ProgressiveMediaPeriod->onUpstreamFormatChanged: " + format, new Throwable());
     handler.post(maybeFinishPrepareRunnable);
   }
 
@@ -807,7 +807,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
   }
 
   private TrackOutput prepareTrackOutput(TrackId id) {
-    android.util.Log.d("jianjun", "ProgressiveMediaPeriod->prepareTrackOutput: " + id.id, new Throwable());
+//    androidx.media3.common.util.JLog.d("jianjun", "ProgressiveMediaPeriod->prepareTrackOutput: " + id.id, new Throwable());
     int trackCount = sampleQueues.length;
     for (int i = 0; i < trackCount; i++) {
       if (id.equals(sampleQueueTrackIds[i])) {
@@ -834,7 +834,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
   private void setSeekMap(SeekMap seekMap) {
     this.seekMap = icyHeaders == null ? seekMap : new Unseekable(/* durationUs= */ C.TIME_UNSET);
     durationUs = seekMap.getDurationUs();
-    android.util.Log.d("jianjun", "ProgressiveMediaPeriod: setSeekMap - durationUs=" + durationUs, new Throwable());
+    androidx.media3.common.util.JLog.d("jianjun", "ProgressiveMediaPeriod: setSeekMap - durationUs=" + durationUs, new Throwable());
     isLive = !isLengthKnown && seekMap.getDurationUs() == C.TIME_UNSET;
     dataType = isLive ? C.DATA_TYPE_MEDIA_PROGRESSIVE_LIVE : C.DATA_TYPE_MEDIA;
     if (prepared) {
@@ -860,7 +860,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
     for (int i = 0; i < trackCount; i++) {
       Format trackFormat = checkNotNull(sampleQueues[i].getUpstreamFormat());
       @Nullable String mimeType = trackFormat.sampleMimeType;
-      android.util.Log.d("jianjun", "ProgressiveMediaPeriod(trackCount:" + trackCount + ")->mimeType: " + mimeType);
+//      androidx.media3.common.util.JLog.d("jianjun", "ProgressiveMediaPeriod(trackCount:" + trackCount + ")->mimeType: " + mimeType);
       boolean isAudio = MimeTypes.isAudio(mimeType);
       boolean isAudioVideo = isAudio || MimeTypes.isVideo(mimeType);
       trackIsAudioVideoFlags[i] = isAudioVideo;
@@ -1149,18 +1149,18 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
             pendingExtractorSeek = false;
           }
           while (result == Extractor.RESULT_CONTINUE && !loadCanceled) {
-            android.util.Log.d("jianjun", "ProgressiveMediaExtractor: load - loadCondition.block");
+            //androidx.media3.common.util.JLog.d("jianjun", "ProgressiveMediaExtractor: load - loadCondition.block");
             try {
               loadCondition.block();
             } catch (InterruptedException e) {
               throw new InterruptedIOException();
             }
             result = progressiveMediaExtractor.read(positionHolder);
-            android.util.Log.d("jianjun", "ProgressiveMediaExtractor: load - result=" + result);
+            //androidx.media3.common.util.JLog.d("jianjun", "ProgressiveMediaExtractor: load - result=" + result);
             long currentInputPosition = progressiveMediaExtractor.getCurrentInputPosition();
             if (currentInputPosition > position + continueLoadingCheckIntervalBytes) {
               position = currentInputPosition;
-              android.util.Log.d("jianjun", "ProgressiveMediaExtractor: load - loadCondition.close");
+              //androidx.media3.common.util.JLog.d("jianjun", "ProgressiveMediaExtractor: load - loadCondition.close");
               loadCondition.close();
               handler.post(onContinueLoadingRequestedRunnable);
             }

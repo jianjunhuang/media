@@ -388,7 +388,7 @@ public final class ProgressiveMediaSource extends BaseMediaSource
 
   @Override
   public MediaPeriod createPeriod(MediaPeriodId id, Allocator allocator, long startPositionUs) {
-    android.util.Log.i("jianjun", "createPeriod", new Throwable());
+//    android.util.Log.i("jianjun", "createPeriod", new Throwable());
     DataSource dataSource = dataSourceFactory.createDataSource();
     if (transferListener != null) {
       dataSource.addTransferListener(transferListener);

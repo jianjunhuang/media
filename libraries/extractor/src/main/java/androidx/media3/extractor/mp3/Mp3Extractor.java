@@ -222,13 +222,13 @@ public final class Mp3Extractor implements Extractor {
 
   @Override
   public boolean sniff(ExtractorInput input) throws IOException {
-    android.util.Log.d("jianjun", "sniff: ", new Throwable());
+//    androidx.media3.common.util.JLog.d("jianjun", "sniff: ", new Throwable());
     return synchronize(input, true);
   }
 
   @Override
   public void init(ExtractorOutput output) {
-    android.util.Log.d("jianjun", "init: ", new Throwable());
+//    androidx.media3.common.util.JLog.d("jianjun", "init: ", new Throwable());
     extractorOutput = output;
     realTrackOutput = extractorOutput.track(0, C.TRACK_TYPE_AUDIO);
     currentTrackOutput = realTrackOutput;
@@ -237,7 +237,7 @@ public final class Mp3Extractor implements Extractor {
 
   @Override
   public void seek(long position, long timeUs) {
-    android.util.Log.d("jianjun", "seek: ", new Throwable());
+//    androidx.media3.common.util.JLog.d("jianjun", "seek: ", new Throwable());
     synchronizedHeaderData = 0;
     basisTimeUs = C.TIME_UNSET;
     samplesRead = 0;
@@ -251,7 +251,7 @@ public final class Mp3Extractor implements Extractor {
 
   @Override
   public void release() {
-    android.util.Log.d(TAG, "release: " , new Throwable());
+    androidx.media3.common.util.JLog.d(TAG, "release: " , new Throwable());
     // Do nothing
   }
 

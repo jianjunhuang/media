@@ -497,7 +497,7 @@ public final class AviExtractor implements Extractor {
 
   @Nullable
   private ChunkReader processStreamList(ListChunk streamList, int streamId) {
-    android.util.Log.d("jianjun", "processStreamList streamId = " + streamId, new Throwable());
+//    androidx.media3.common.util.JLog.d("jianjun", "processStreamList streamId = " + streamId, new Throwable());
     AviStreamHeaderChunk aviStreamHeaderChunk = streamList.getChild(AviStreamHeaderChunk.class);
     StreamFormatChunk streamFormatChunk = streamList.getChild(StreamFormatChunk.class);
     if (aviStreamHeaderChunk == null) {
@@ -510,7 +510,7 @@ public final class AviExtractor implements Extractor {
     }
     long durationUs = aviStreamHeaderChunk.getDurationUs();
     Format streamFormat = streamFormatChunk.format;
-    android.util.Log.d("jianjun", "processStreamList streamFormat = " + streamFormat, new Throwable());
+//    androidx.media3.common.util.JLog.d("jianjun", "processStreamList streamFormat = " + streamFormat, new Throwable());
     Format.Builder builder = streamFormat.buildUpon();
     builder.setId(streamId);
     int suggestedBufferSize = aviStreamHeaderChunk.suggestedBufferSize;
