@@ -246,8 +246,8 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer
   private boolean shouldDropDecoderInputBuffers;
   private int consecutiveDroppedInputBufferCount;
 
-  private File mVideoDumpFile = null;
-  private FileOutputStream mVideoDumpFileOutputStream = null;
+//  private File mVideoDumpFile = null;
+//  private FileOutputStream mVideoDumpFileOutputStream = null;
 
   /**
    * A builder to create {@link MediaCodecVideoRenderer} instances.
@@ -1103,10 +1103,10 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer
     haveReportedFirstFrameRenderedForCurrentSurface = false;
     tunnelingOnFrameRenderedListener = null;
     try {
-      if (mVideoDumpFileOutputStream != null) {
-        mVideoDumpFileOutputStream.flush();
-        mVideoDumpFileOutputStream.close();
-      }
+//      if (mVideoDumpFileOutputStream != null) {
+//        mVideoDumpFileOutputStream.flush();
+//        mVideoDumpFileOutputStream.close();
+//      }
       super.onDisabled();
     } catch (IOException e) {
       android.util.Log.e(TAG, "onDisabled: ", e);
@@ -1119,10 +1119,10 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer
   @Override
   protected void onReset() {
     try {
-      if (mVideoDumpFileOutputStream != null) {
-        mVideoDumpFileOutputStream.flush();
-        mVideoDumpFileOutputStream.close();
-      }
+//      if (mVideoDumpFileOutputStream != null) {
+//        mVideoDumpFileOutputStream.flush();
+//        mVideoDumpFileOutputStream.close();
+//      }
       super.onReset();
     } catch (IOException e) {
       android.util.Log.e(TAG, "onReset: ", e);
@@ -1635,18 +1635,18 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer
   @Override
   protected void onOutputFormatChanged(Format format, @Nullable MediaFormat mediaFormat) {
     @Nullable MediaCodecAdapter codec = getCodec();
-    if (mVideoDumpFile == null && mVideoDumpFileOutputStream == null) {
-      try {
-        // Create a video dump file in the app's files directory.
-        mVideoDumpFile = new File(context.getFilesDir(),
-            "video_dump_" + format.width + "_" + format.height + "_" + getColorFormat(mediaFormat)
-                + ".yuv");
-        mVideoDumpFileOutputStream = new FileOutputStream(mVideoDumpFile);
-        android.util.Log.i(TAG, "Video dump file created: " + mVideoDumpFile.getAbsolutePath());
-      } catch (IOException e) {
-        Log.w(TAG, "Failed to create video dump file", e);
-      }
-    }
+//    if (mVideoDumpFile == null && mVideoDumpFileOutputStream == null) {
+//      try {
+//        // Create a video dump file in the app's files directory.
+//        mVideoDumpFile = new File(context.getFilesDir(),
+//            "video_dump_" + format.width + "_" + format.height + "_" + getColorFormat(mediaFormat)
+//                + ".yuv");
+//        mVideoDumpFileOutputStream = new FileOutputStream(mVideoDumpFile);
+//        android.util.Log.i(TAG, "Video dump file created: " + mVideoDumpFile.getAbsolutePath());
+//      } catch (IOException e) {
+//        Log.w(TAG, "Failed to create video dump file", e);
+//      }
+//    }
     if (codec != null) {
       // Must be applied each time the output format changes.
       codec.setVideoScalingMode(scalingMode);
