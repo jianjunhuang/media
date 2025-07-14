@@ -88,3 +88,5 @@ libraries/decoder_iamf/src/main/jni/libiamf
 
 # MPEG-H decoder extension
 libraries/decoder_mpegh/src/main/jni/libmpegh
+
+aar_output/
