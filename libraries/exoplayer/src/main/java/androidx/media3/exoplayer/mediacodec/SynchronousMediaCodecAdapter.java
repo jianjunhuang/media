@@ -16,6 +16,7 @@
 
 package androidx.media3.exoplayer.mediacodec;
 
+import static android.os.Build.VERSION.SDK_INT;
 import static androidx.media3.common.util.Assertions.checkNotNull;
 
 import android.annotation.SuppressLint;
@@ -32,7 +33,6 @@ import androidx.annotation.RequiresApi;
 import androidx.media3.common.C;
 import androidx.media3.common.util.TraceUtil;
 import androidx.media3.common.util.UnstableApi;
-import androidx.media3.common.util.Util;
 import androidx.media3.decoder.CryptoInfo;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -56,7 +56,7 @@ public final class SynchronousMediaCodecAdapter implements MediaCodecAdapter {
         int flags = 0;
         if (configuration.surface == null
             && configuration.codecInfo.detachedSurfaceSupported
-            && Util.SDK_INT >= 35) {
+            && SDK_INT >= 35) {
           flags |= MediaCodec.CONFIGURE_FLAG_DETACHED_SURFACE;
         }
         androidx.media3.common.util.JLog.i("jianjun", "createAdapter: createCodec");
@@ -93,7 +93,7 @@ public final class SynchronousMediaCodecAdapter implements MediaCodecAdapter {
       MediaCodec mediaCodec, @Nullable LoudnessCodecController loudnessCodecController) {
     this.codec = mediaCodec;
     this.loudnessCodecController = loudnessCodecController;
-    if (Util.SDK_INT >= 35 && loudnessCodecController != null) {
+    if (SDK_INT >= 35 && loudnessCodecController != null) {
       loudnessCodecController.addMediaCodec(codec);
     }
   }
@@ -166,7 +166,7 @@ public final class SynchronousMediaCodecAdapter implements MediaCodecAdapter {
   @Override
   public void release() {
     try {
-      if (Util.SDK_INT >= 30 && Util.SDK_INT < 33) {
+      if (SDK_INT >= 30 && SDK_INT < 33) {
         // Stopping the codec before releasing it works around a bug on APIs 30, 31 and 32 where
         // MediaCodec.release() returns too early before fully detaching a Surface, and a
         // subsequent MediaCodec.configure() call using the same Surface then fails. See
@@ -174,7 +174,7 @@ public final class SynchronousMediaCodecAdapter implements MediaCodecAdapter {
         codec.stop();
       }
     } finally {
-      if (Util.SDK_INT >= 35 && loudnessCodecController != null) {
+      if (SDK_INT >= 35 && loudnessCodecController != null) {
         loudnessCodecController.removeMediaCodec(codec);
       }
       codec.release();

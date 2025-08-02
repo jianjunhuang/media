@@ -15,10 +15,12 @@
  */
 package androidx.media3.demo.main;
 
+import android.content.ContentResolver;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.util.Pair;
 import android.view.KeyEvent;
 import android.view.View;
@@ -43,6 +45,7 @@ import androidx.media3.common.Tracks;
 import androidx.media3.common.util.JLog;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
+import androidx.media3.datasource.DataSchemeDataSource;
 import androidx.media3.datasource.DataSource;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.RenderersFactory;
@@ -68,9 +71,7 @@ import java.util.Collections;
 import java.util.List;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
-/**
- * An activity that plays media using {@link ExoPlayer}.
- */
+/** An activity that plays media using {@link ExoPlayer}. */
 public class PlayerActivity extends AppCompatActivity
     implements OnClickListener, PlayerView.ControllerVisibilityListener {
 
@@ -535,16 +536,23 @@ public class PlayerActivity extends AppCompatActivity
       lastSeenTracks = tracks;
     }
 
+    @OptIn(markerClass = UnstableApi.class) // For PlayerView.setTimeBarScrubbingEnabled
     @Override
-    public void onMediaMetadataChanged(MediaMetadata mediaMetadata) {
-      Player.Listener.super.onMediaMetadataChanged(mediaMetadata);
-      androidx.media3.common.util.JLog.d("jianjun", "PlayerActivity -> onMediaMetadataChanged: " + mediaMetadata);
-    }
-
-    @Override
-    public void onMetadata(Metadata metadata) {
-      Player.Listener.super.onMetadata(metadata);
-      androidx.media3.common.util.JLog.d("jianjun", "PlayerActivity -> onMetadata: " + metadata);
+    public void onMediaItemTransition(@Nullable MediaItem mediaItem, int reason) {
+      if (playerView == null) {
+        return;
+      }
+      if (mediaItem == null) {
+        playerView.setTimeBarScrubbingEnabled(false);
+        return;
+      }
+      String uriScheme = mediaItem.localConfiguration.uri.getScheme();
+      playerView.setTimeBarScrubbingEnabled(
+          TextUtils.isEmpty(uriScheme)
+              || uriScheme.equals(ContentResolver.SCHEME_FILE)
+              || uriScheme.equals("asset")
+              || uriScheme.equals(DataSchemeDataSource.SCHEME_DATA)
+              || uriScheme.equals(ContentResolver.SCHEME_ANDROID_RESOURCE));
     }
   }
 
