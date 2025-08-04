@@ -32,6 +32,7 @@ import androidx.media3.common.C.FormatSupport;
 import androidx.media3.common.Timeline;
 import androidx.media3.common.TrackGroup;
 import androidx.media3.common.Tracks;
+import androidx.media3.common.util.JLog;
 import androidx.media3.common.util.NullableType;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
@@ -436,7 +437,7 @@ public abstract class MappingTrackSelector extends TrackSelector {
     Tracks tracks = TrackSelectionUtil.buildTracks(mappedTrackInfo, result.second);
 
     TrackSelectorResult trackSelectorResult = new TrackSelectorResult(result.first, result.second, tracks, mappedTrackInfo);
-    android.util.Log.d("jianjun", "MappingTrackSelector -- timeline.getDurationUs:" + timeline, new Throwable());
+    JLog.d("jianjun", "MappingTrackSelector -- timeline.getDurationUs:" + timeline, new Throwable());
     return trackSelectorResult;
   }
 

@@ -40,14 +40,19 @@ import androidx.media3.common.MediaMetadata;
 import androidx.media3.common.Metadata;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
+import androidx.media3.common.Timeline;
 import androidx.media3.common.TrackSelectionParameters;
 import androidx.media3.common.Tracks;
 import androidx.media3.common.util.JLog;
+import androidx.media3.common.util.NullableType;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
 import androidx.media3.datasource.DataSchemeDataSource;
 import androidx.media3.datasource.DataSource;
+import androidx.media3.exoplayer.ExoPlaybackException;
 import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.exoplayer.RendererCapabilities;
+import androidx.media3.exoplayer.RendererConfiguration;
 import androidx.media3.exoplayer.RenderersFactory;
 import androidx.media3.exoplayer.drm.DefaultDrmSessionManagerProvider;
 import androidx.media3.exoplayer.drm.FrameworkMediaDrm;
@@ -60,6 +65,8 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
 import androidx.media3.exoplayer.source.MediaSource;
 import androidx.media3.exoplayer.source.ads.AdsLoader;
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector;
+import androidx.media3.exoplayer.trackselection.ExoTrackSelection;
+import androidx.media3.exoplayer.trackselection.MappingTrackSelector;
 import androidx.media3.exoplayer.trackselection.TrackSelector;
 import androidx.media3.exoplayer.util.DebugTextViewHelper;
 import androidx.media3.exoplayer.util.EventLogger;
@@ -269,6 +276,7 @@ public class PlayerActivity extends AppCompatActivity
    * @return Whether initialization was successful.
    */
   protected boolean initializePlayer() {
+    JLog.setLogLevel(JLog.LOG_LEVEL_ALL);
     Intent intent = getIntent();
     if (player == null) {
 
@@ -284,7 +292,20 @@ public class PlayerActivity extends AppCompatActivity
 //      setRenderersFactory(
 //          playerBuilder, intent.getBooleanExtra(IntentUtil.PREFER_EXTENSION_DECODERS_EXTRA, false));
       setRenderersFactory(
-          playerBuilder, true);
+          playerBuilder, false);
+      playerBuilder.setTrackSelector(new DefaultTrackSelector(this) {
+
+        @Nullable
+        @Override
+        protected Pair<ExoTrackSelection.Definition, Integer> selectAudioTrack(MappedTrackInfo mappedTrackInfo, @RendererCapabilities.Capabilities int[][][] rendererFormatSupports, @RendererCapabilities.AdaptiveSupport int[] rendererMixedMimeTypeAdaptationSupports, Parameters params) throws ExoPlaybackException {
+          JLog.d("PlayerActivity --- DefaultTrackSelector -- selectAudioTrack -- params=" + params );
+          int count = mappedTrackInfo.getRendererCount();
+          for (int i = 0 ; i < count ; i++) {
+            JLog.d("PlayerActivity --- DefaultTrackSelector -- selectAudioTrack -- render=" + mappedTrackInfo.getRendererName(i) + ", type=" + mappedTrackInfo.getRendererType(i) + ", support=" + mappedTrackInfo.getRendererSupport(i));
+          }
+          return super.selectAudioTrack(mappedTrackInfo, rendererFormatSupports, rendererMixedMimeTypeAdaptationSupports, params);
+        }
+      });
       player = playerBuilder.build();
       player.setTrackSelectionParameters(trackSelectionParameters);
       player.addListener(new PlayerEventListener());

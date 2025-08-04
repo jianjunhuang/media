@@ -31,6 +31,7 @@ import androidx.annotation.Nullable;
 import androidx.media3.common.C;
 import androidx.media3.common.Format;
 import androidx.media3.common.Timeline;
+import androidx.media3.common.util.JLog;
 import androidx.media3.exoplayer.metadata.MetadataRenderer;
 import androidx.media3.exoplayer.source.MediaPeriod;
 import androidx.media3.exoplayer.source.MediaSource;
@@ -431,6 +432,7 @@ import java.util.Objects;
    * @throws ExoPlaybackException If an error occurs.
    */
   public void start() throws ExoPlaybackException {
+    JLog.d("RenderHolder --- start() --- " + primaryRenderer.getName(), new Throwable());
     if (primaryRenderer.getState() == STATE_ENABLED
         && (prewarmingState != RENDERER_PREWARMING_STATE_TRANSITIONING_TO_PRIMARY)) {
       primaryRenderer.start();

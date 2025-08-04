@@ -50,6 +50,8 @@ import java.util.concurrent.Executors;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.chromium.net.CronetEngine;
 
+import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.NextRenderersFactory;
+
 /**
  * Utility methods for the demo app.
  */
@@ -96,7 +98,7 @@ public final class DemoUtil {
             ? DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
             : DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
             : DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF;
-    return new DefaultRenderersFactory(context.getApplicationContext())
+    return new NextRenderersFactory(context.getApplicationContext())
         .setMediaCodecSelector(new MediaCodecSelector() {
           @Override
           public List<MediaCodecInfo> getDecoderInfos(String mimeType,

@@ -28,6 +28,7 @@ import androidx.media3.common.MimeTypes;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.common.util.Assertions;
+import androidx.media3.common.util.JLog;
 import androidx.media3.common.util.Log;
 import androidx.media3.common.util.ParsableByteArray;
 import androidx.media3.common.util.UnstableApi;
@@ -391,6 +392,7 @@ public final class Mp3Extractor implements Extractor {
       Id3Decoder.FramePredicate id3FramePredicate =
           parseAllId3Frames ? null : REQUIRED_ID3_FRAME_PREDICATE;
       metadata = id3Peeker.peekId3Data(input, id3FramePredicate);
+      JLog.d("Mp3Extractor --- synchronize --- metadata=" + metadata, new Throwable());
       if (metadata != null) {
         gaplessInfoHolder.setFromMetadata(metadata);
       }
