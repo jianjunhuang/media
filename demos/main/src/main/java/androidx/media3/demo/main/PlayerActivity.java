@@ -71,6 +71,7 @@ import androidx.media3.exoplayer.trackselection.TrackSelector;
 import androidx.media3.exoplayer.util.DebugTextViewHelper;
 import androidx.media3.exoplayer.util.EventLogger;
 import androidx.media3.extractor.DefaultExtractorsFactory;
+import androidx.media3.extractor.mp4.Mp4Extractor;
 import androidx.media3.extractor.ts.TsExtractor;
 import androidx.media3.ui.PlayerView;
 import java.util.ArrayList;
@@ -350,6 +351,7 @@ public class PlayerActivity extends AppCompatActivity
                 .setDataSourceFactory(dataSourceFactory));
     DefaultExtractorsFactory extractorsFactory = new DefaultExtractorsFactory();
     extractorsFactory.setTsExtractorMode(TsExtractor.MODE_MULTI_PMT);
+    extractorsFactory.setMp4ExtractorFlags(Mp4Extractor.FLAG_DETACH_MP3_LAYER);
     extractorsFactory.setConstantBitrateSeekingEnabled(true);
     return new DefaultMediaSourceFactory(/* context= */ this, extractorsFactory)
         .setDataSourceFactory(dataSourceFactory)

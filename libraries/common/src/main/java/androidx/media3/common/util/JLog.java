@@ -224,6 +224,13 @@ public final class JLog {
   public static void d(String message, @Nullable Throwable throwable) {
     d(TAG, message, throwable);
   }
+
+  @Pure
+  public static void w(String message, @Nullable Throwable throwable) {
+    w(TAG, message, throwable);
+  }
+
+
   /**
    * Logs a debug-level message with an optional associated {@link Throwable}.
    *

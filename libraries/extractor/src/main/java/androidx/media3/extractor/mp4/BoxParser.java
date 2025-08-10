@@ -2172,10 +2172,11 @@ public final class BoxParser {
                 ? childPosition
                 : findBoxPosition(parent, Mp4Box.TYPE_esds, childPosition, childAtomSize);
         if (esdsAtomPosition != C.INDEX_UNSET) {
-          //TODO mp3float
           esdsData = parseEsdsFromParent(parent, esdsAtomPosition);
           mimeType = esdsData.mimeType;
           @Nullable byte[] initializationDataBytes = esdsData.initializationData;
+          JLog.d("BoxParser --- parseAudioSampleEntry, mimeType=" + mimeType
+              + ", initializationDataBytes size=" + (initializationDataBytes != null ? initializationDataBytes.length : "null"));
           if (initializationDataBytes != null) {
             if (MimeTypes.AUDIO_VORBIS.equals(mimeType)) {
               initializationData =

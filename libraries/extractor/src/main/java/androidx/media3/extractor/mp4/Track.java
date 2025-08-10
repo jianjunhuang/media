@@ -18,6 +18,7 @@ package androidx.media3.extractor.mp4;
 import static java.lang.annotation.ElementType.TYPE_USE;
 
 import androidx.annotation.IntDef;
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.media3.common.C;
 import androidx.media3.common.Format;
@@ -166,5 +167,30 @@ public final class Track {
         nalUnitLengthFieldLength,
         /* editListDurations= */ null,
         /* editListMediaTimes= */ null);
+  }
+
+  @NonNull
+  @Override
+  public String toString() {
+    return "Track{"
+        + "id="
+        + id
+        + ", type="
+        + type
+        + ", timescale="
+        + timescale
+        + ", movieTimescale="
+        + movieTimescale
+        + ", durationUs="
+        + durationUs
+        + ", mediaDurationUs="
+        + mediaDurationUs
+        + ", format="
+        + format
+        + ", sampleTransformation="
+        + sampleTransformation
+        + ", nalUnitLengthFieldLength="
+        + nalUnitLengthFieldLength
+        + '}';
   }
 }

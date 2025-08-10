@@ -23,6 +23,7 @@ import androidx.annotation.Nullable;
 import androidx.media3.common.C;
 import androidx.media3.common.Format;
 import androidx.media3.common.Timeline;
+import androidx.media3.common.util.JLog;
 import androidx.media3.common.util.Log;
 import androidx.media3.common.util.NullableType;
 import androidx.media3.exoplayer.source.ClippingMediaPeriod;
@@ -215,6 +216,7 @@ import java.io.IOException;
       throws ExoPlaybackException {
     prepared = true;
     trackGroups = mediaPeriod.getTrackGroups();
+    JLog.d("MediaPeriodHolder --- handlePrepared --- mediaPeriod " + mediaPeriod + ", uid=" + uid + ", info=" + info + ", trackGroups=" + trackGroups);
     TrackSelectorResult selectorResult = selectTracks(playbackSpeed, timeline, playWhenReady);
     long requestedStartPositionUs = info.startPositionUs;
     if (info.durationUs != C.TIME_UNSET && requestedStartPositionUs >= info.durationUs) {

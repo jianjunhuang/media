@@ -34,6 +34,7 @@ import static java.lang.Math.min;
 import static java.lang.annotation.ElementType.TYPE_USE;
 
 import androidx.annotation.IntDef;
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.media3.common.C;
 import androidx.media3.common.Format;
@@ -41,6 +42,7 @@ import androidx.media3.common.Metadata;
 import androidx.media3.common.MimeTypes;
 import androidx.media3.common.ParserException;
 import androidx.media3.common.util.Assertions;
+import androidx.media3.common.util.JLog;
 import androidx.media3.common.util.ParsableByteArray;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.container.MdtaMetadataEntry;
@@ -108,7 +110,8 @@ public final class Mp4Extractor implements Extractor, SeekMap {
         FLAG_EMIT_RAW_SUBTITLE_DATA,
         FLAG_READ_WITHIN_GOP_SAMPLE_DEPENDENCIES,
         FLAG_READ_AUXILIARY_TRACKS,
-        FLAG_READ_WITHIN_GOP_SAMPLE_DEPENDENCIES_H265
+        FLAG_READ_WITHIN_GOP_SAMPLE_DEPENDENCIES_H265,
+        FLAG_DETACH_MP3_LAYER,
       })
   public @interface Flags {}
 
@@ -173,6 +176,12 @@ public final class Mp4Extractor implements Extractor, SeekMap {
    * <p>See {@link #FLAG_READ_WITHIN_GOP_SAMPLE_DEPENDENCIES}.
    */
   public static final int FLAG_READ_WITHIN_GOP_SAMPLE_DEPENDENCIES_H265 = 1 << 7;
+
+  /**
+   * Flag to detach the MP3 layer from the MP4 container.
+   *
+   */
+  public static final int FLAG_DETACH_MP3_LAYER = 1 << 8;
 
   /**
    * @deprecated Use {@link #newFactory(SubtitleParser.Factory)} instead.
@@ -353,6 +362,8 @@ public final class Mp4Extractor implements Extractor, SeekMap {
 
   @Override
   public void init(ExtractorOutput output) {
+      JLog.d("Mp4Extractor --- init() --- flags: " + flags
+          + ", subtitleParserFactory: " + subtitleParserFactory + ", output: " + output);
     extractorOutput =
         (flags & FLAG_EMIT_RAW_SUBTITLE_DATA) == 0
             ? new SubtitleTranscodingExtractorOutput(output, subtitleParserFactory)
@@ -567,7 +578,7 @@ public final class Mp4Extractor implements Extractor, SeekMap {
       }
       containerAtoms.push(new ContainerBox(atomType, endPosition));
       if (atomSize == atomHeaderBytesRead) {
-        processAtomEnded(endPosition);
+        processAtomEnded(input, endPosition);
       } else {
         // Start reading the first child atom.
         enterReadingAtomHeaderState();
@@ -624,7 +635,7 @@ public final class Mp4Extractor implements Extractor, SeekMap {
         seekRequired = true;
       }
     }
-    processAtomEnded(atomEndPosition);
+    processAtomEnded(input, atomEndPosition);
     if (seekToAxteAtom) {
       readingAuxiliaryTracks = true;
       positionHolder.position = axteAtomOffset;
@@ -643,12 +654,12 @@ public final class Mp4Extractor implements Extractor, SeekMap {
     return result;
   }
 
-  private void processAtomEnded(long atomEndPosition) throws ParserException {
+  private void processAtomEnded(ExtractorInput input, long atomEndPosition) throws ParserException {
     while (!containerAtoms.isEmpty() && containerAtoms.peek().endPosition == atomEndPosition) {
       ContainerBox containerAtom = containerAtoms.pop();
       if (containerAtom.type == Mp4Box.TYPE_moov) {
         // We've reached the end of the moov atom. Process it and prepare to read samples.
-        processMoovAtom(containerAtom);
+        processMoovAtom(input, containerAtom);
         containerAtoms.clear();
         if (!seekToAxteAtom) {
           parserState = STATE_READING_SAMPLE;
@@ -667,7 +678,7 @@ public final class Mp4Extractor implements Extractor, SeekMap {
    *
    * <p>The processing is aborted if the axte.moov atom needs to be processed instead.
    */
-  private void processMoovAtom(ContainerBox moov) throws ParserException {
+  private void processMoovAtom(ExtractorInput input, ContainerBox moov) throws ParserException {
     // Process metadata first to determine whether to abort processing and seek to the axte atom.
     @Nullable Metadata mdtaMetadata = null;
     @Nullable Mp4Box.ContainerBox meta = moov.getContainerBoxOfType(Mp4Box.TYPE_meta);
@@ -725,6 +736,7 @@ public final class Mp4Extractor implements Extractor, SeekMap {
     }
     int trackIndex = 0;
     String containerMimeType = getContainerMimeType(trackSampleTables);
+    boolean detectedMp3Layer = false;
     for (int i = 0; i < trackSampleTables.size(); i++) {
       TrackSampleTable trackSampleTable = trackSampleTables.get(i);
       if (trackSampleTable.sampleCount == 0) {
@@ -774,6 +786,10 @@ public final class Mp4Extractor implements Extractor, SeekMap {
           udtaMetadata,
           mvhdMetadata);
       formatBuilder.setContainerMimeType(containerMimeType);
+      if (MimeTypes.AUDIO_MPEG.equals(track.format.sampleMimeType) && (flags & FLAG_DETACH_MP3_LAYER) != 0) {
+          JLog.d("Mp4Extractor ---- processMoovAtom --- sampleSize --- " + mp4Track.sampleTable.sampleCount);
+          detectedMp3Layer = true;
+      }
       mp4Track.trackOutput.format(formatBuilder.build());
 
       if (track.type == C.TRACK_TYPE_VIDEO && firstVideoTrackIndex == C.INDEX_UNSET) {
@@ -786,8 +802,64 @@ public final class Mp4Extractor implements Extractor, SeekMap {
     this.tracks = tracks.toArray(new Mp4Track[0]);
     accumulatedSampleSizes = calculateAccumulatedSampleSizes(this.tracks);
 
+    if (detectedMp3Layer) {
+        detachMp3RealMimeType(input, this.tracks);
+    }
     extractorOutput.endTracks();
     extractorOutput.seekMap(this);
+  }
+
+  private void detachMp3RealMimeType(ExtractorInput input, Mp4Track[] tracks) {
+      String realAudioMimeType = MimeTypes.AUDIO_UNKNOWN;
+      int sampleTrackIndex = C.INDEX_UNSET;
+      long inputPosition = input.getPosition();
+      long sampleBytesRead = 0;
+      while (true) {
+          sampleTrackIndex = getTrackIndexOfNextReadSample(inputPosition);
+          if (sampleTrackIndex != C.INDEX_UNSET) {
+              Mp4Track track = tracks[sampleTrackIndex];
+              int sampleIndex = track.sampleIndex;
+              long position = track.sampleTable.offsets[sampleIndex] + sampleOffsetForAuxiliaryTracks;
+              int sampleSize = track.sampleTable.sizes[sampleIndex];
+              long skipAmount = (position - inputPosition + sampleBytesRead);
+              sampleBytesRead += sampleSize;
+              if (track.track.sampleTransformation == Track.TRANSFORMATION_CEA608_CDAT) {
+                  skipAmount += Mp4Box.HEADER_SIZE;
+              }
+              if (MimeTypes.AUDIO_MPEG.equals(track.track.format.sampleMimeType)) {
+                  long finalSkip = skipAmount + inputPosition;
+                  JLog.d("Mp4Extractor ---- processMoovAtom --- skipAmount=" + skipAmount + ", position=" + position + ", input.getPosition=" + inputPosition + ", finalSkip=" + finalSkip);
+                  int length = (int) (4 + finalSkip);
+                  ParsableByteArray frameHeader = new ParsableByteArray(length);
+                  try {
+                      input.peekFully(frameHeader.getData(), 0, length);
+                      frameHeader.setPosition((int)finalSkip);
+                      int header = frameHeader.readInt();
+                      int layer = (header >>> 17) & 3;
+                      JLog.d("Mp4Extractor ---- processMoovAtom --- layer=" + layer);
+                      if (layer == 3) {
+                          // Layer I.
+                          realAudioMimeType = MimeTypes.AUDIO_MPEG_L1;
+                      } else if (layer == 2) {
+                          // Layer II.
+                          realAudioMimeType = MimeTypes.AUDIO_MPEG_L2;
+                      } else {// Layer III.
+                          realAudioMimeType = MimeTypes.AUDIO_MPEG;
+                      }
+                      if (!MimeTypes.AUDIO_MPEG.equals(realAudioMimeType)) {
+                          tracks[sampleTrackIndex].trackOutput.format(track.track.format.buildUpon()
+                                          .setSampleMimeType(realAudioMimeType).build());
+                          JLog.d("Mp4Extractor ---- processMoovAtom --- extractorOutput=" + extractorOutput + ", resetTrack=" + this.tracks[sampleTrackIndex]);
+                      }
+                  } catch (Throwable e) {
+                      JLog.w("Mp4Extractor ---- processMoovAtom --- ", e);
+                  }
+                  break;
+              }
+              JLog.d("Mp4Extractor ---- processMoovAtom --- skipAmount=" + skipAmount + ", position=" + position + ", input.getPosition=" + inputPosition);
+              inputPosition += (skipAmount + sampleSize);
+          }
+      }
   }
 
   private boolean shouldSeekToAxteAtom(@Nullable Metadata mdtaMetadata) {
@@ -1285,5 +1357,22 @@ public final class Mp4Extractor implements Extractor, SeekMap {
               ? new TrueHdSampleRechunker()
               : null;
     }
+
+      @NonNull
+      @Override
+      public String toString() {
+        return "Mp4Track{"
+            + "track="
+            + track
+            + ", sampleTable="
+            + sampleTable
+            + ", trackOutput="
+            + trackOutput
+            + ", trueHdSampleRechunker="
+            + trueHdSampleRechunker
+            + ", sampleIndex="
+            + sampleIndex
+            + '}';
+      }
   }
 }

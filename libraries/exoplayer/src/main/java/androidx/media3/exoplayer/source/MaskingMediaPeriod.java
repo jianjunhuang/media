@@ -21,6 +21,7 @@ import static androidx.media3.common.util.Util.castNonNull;
 
 import androidx.annotation.Nullable;
 import androidx.media3.common.C;
+import androidx.media3.common.util.JLog;
 import androidx.media3.common.util.NullableType;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.exoplayer.LoadingInfo;
@@ -171,6 +172,7 @@ public final class MaskingMediaPeriod implements MediaPeriod, MediaPeriod.Callba
 
   @Override
   public TrackGroupArray getTrackGroups() {
+    JLog.d("MaskingMediaPeriod --- getTrackGroups() --- mediaPeriod: " + mediaPeriod);
     return castNonNull(mediaPeriod).getTrackGroups();
   }
 
