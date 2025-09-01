@@ -35,6 +35,7 @@ import androidx.media3.common.Format;
 import androidx.media3.common.Metadata;
 import androidx.media3.common.MimeTypes;
 import androidx.media3.common.ParserException;
+import androidx.media3.common.util.JLog;
 import androidx.media3.common.util.Log;
 import androidx.media3.common.util.ParsableByteArray;
 import androidx.media3.common.util.TimestampAdjuster;
@@ -109,7 +110,8 @@ public class FragmentedMp4Extractor implements Extractor {
         FLAG_EMIT_RAW_SUBTITLE_DATA,
         FLAG_READ_WITHIN_GOP_SAMPLE_DEPENDENCIES,
         FLAG_READ_WITHIN_GOP_SAMPLE_DEPENDENCIES_H265,
-        FLAG_MERGE_FRAGMENTED_SIDX
+        FLAG_MERGE_FRAGMENTED_SIDX,
+              FLAG_READ_DURATION_FROM_MOOF
       })
   public @interface Flags {}
 
@@ -164,6 +166,9 @@ public class FragmentedMp4Extractor implements Extractor {
 
   /** Flag to enable reading and merging of all sidx boxes before continuing extraction. */
   public static final int FLAG_MERGE_FRAGMENTED_SIDX = 1 << 8;
+
+  /** Flag to enable reading moof to get duration before continuing extraction. */
+  public static final int FLAG_READ_DURATION_FROM_MOOF = 1 << 9;
 
   /**
    * @deprecated Use {@link #newFactory(SubtitleParser.Factory)} instead.
@@ -245,6 +250,10 @@ public class FragmentedMp4Extractor implements Extractor {
   private int sampleCurrentNalBytesRemaining;
   private boolean isSampleDependedOn;
   private boolean processSeiNalUnitPayload;
+
+  // Pre-scan trigger
+  private boolean shouldPreScanMoof;
+  private final MoofPreScanner moofPreScanner;
 
   // Outputs.
   private ExtractorOutput extractorOutput;
@@ -444,6 +453,8 @@ public class FragmentedMp4Extractor implements Extractor {
                 CeaUtil.consume(presentationTimeUs, buffer, ceaTrackOutputs));
     chunkIndexMerger = new ChunkIndexMerger();
     seekPositionBeforeSidxProcessing = C.INDEX_UNSET;
+    shouldPreScanMoof = false;
+    moofPreScanner = new MoofPreScanner();
   }
 
   /**
@@ -505,6 +516,7 @@ public class FragmentedMp4Extractor implements Extractor {
               formatBuilder.build());
       trackBundles.put(0, bundle);
       extractorOutput.endTracks();
+      JLog.d(TAG, "init --- sideloadedTrack is not null, trackBundles.size()=" + trackBundles.size());
     }
   }
 
@@ -532,7 +544,35 @@ public class FragmentedMp4Extractor implements Extractor {
     while (true) {
       switch (parserState) {
         case STATE_READING_ATOM_HEADER:
+          JLog.d(TAG, "read --- STATE_READING_ATOM_HEADER");
+          // If pre-scan was requested, run it now, set SeekMap and resume.
+          if (shouldPreScanMoof && !haveOutputSeekMap) {
+            moofPreScanner.start(input);
+            MoofPreScanner.Result result =
+                moofPreScanner.scanToEndAndReset(
+                    input,
+                    new MoofPreScanner.TrackInfoProvider() {
+                      @Override
+                      public long getTimescale(int trackId) {
+                        TrackBundle tb = trackBundles.get(trackId);
+                        return tb != null ? tb.moovSampleTable.track.timescale : 0L;
+                      }
+
+                      @Override
+                      public int getDefaultSampleDuration(int trackId) {
+                        TrackBundle tb = trackBundles.get(trackId);
+                        return tb != null ? tb.defaultSampleValues.duration : 0;
+                      }
+                    });
+            durationUs = Math.max(durationUs, result.durationUs);
+            extractorOutput.seekMap(result.seekMap);
+            haveOutputSeekMap = true;
+            extractorOutput.endTracks();
+            shouldPreScanMoof = false;
+            return Extractor.RESULT_SEEK;
+          }
           if (!readAtomHeader(input)) {
+            JLog.w(TAG, "read --- STATE_READING_ATOM_HEADER end");
             if (seekPositionBeforeSidxProcessing != C.INDEX_UNSET) {
               seekPosition.position = seekPositionBeforeSidxProcessing;
               seekPositionBeforeSidxProcessing = C.INDEX_UNSET;
@@ -546,14 +586,19 @@ public class FragmentedMp4Extractor implements Extractor {
           }
           break;
         case STATE_READING_ATOM_PAYLOAD:
+          JLog.d(TAG, "read --- STATE_READING_ATOM_PAYLOAD");
           readAtomPayload(input);
           break;
         case STATE_READING_ENCRYPTION_DATA:
+          JLog.d(TAG, "read --- STATE_READING_ENCRYPTION_DATA");
           readEncryptionData(input);
           break;
         default:
+          JLog.d(TAG, "read --- STATE_READING_SAMPLE_XXXX");
           if (readSample(input)) {
             return RESULT_CONTINUE;
+          } else {
+            JLog.w(TAG, "read --- STATE_READING_SAMPLE_XXXX");
           }
       }
     }
@@ -592,6 +637,7 @@ public class FragmentedMp4Extractor implements Extractor {
       if (endPosition != C.LENGTH_UNSET) {
         atomSize = endPosition - input.getPosition() + atomHeaderBytesRead;
       }
+      JLog.d(TAG, "readAtomHeader --- the atom extends to the end of the file");
     }
 
     if (atomSize < atomHeaderBytesRead) {
@@ -618,7 +664,8 @@ public class FragmentedMp4Extractor implements Extractor {
 
     long atomPosition = input.getPosition() - atomHeaderBytesRead;
     if (atomType == Mp4Box.TYPE_moof || atomType == Mp4Box.TYPE_mdat) {
-      if (!haveOutputSeekMap) {
+      if (!haveOutputSeekMap && (flags & FLAG_READ_DURATION_FROM_MOOF) == 0) {
+        JLog.w(TAG, "readAtomHeader --- atomType is moof or mdat, haveOutputSeekMap is false, durationUs=" + durationUs);
         // This must be the first moof or mdat in the stream.
         extractorOutput.seekMap(new SeekMap.Unseekable(durationUs, atomPosition));
         haveOutputSeekMap = true;
@@ -702,8 +749,10 @@ public class FragmentedMp4Extractor implements Extractor {
 
   private void processAtomEnded(long atomEndPosition) throws ParserException {
     while (!containerAtoms.isEmpty() && containerAtoms.peek().endPosition == atomEndPosition) {
+      JLog.d(TAG, "processAtomEnded --- onContainerAtomRead");
       onContainerAtomRead(containerAtoms.pop());
     }
+    JLog.d(TAG, "processAtomEnded --- atomType=" + (atomType) + ", durationUs=" + durationUs);
     enterReadingAtomHeaderState();
   }
 
@@ -729,10 +778,13 @@ public class FragmentedMp4Extractor implements Extractor {
 
   private void onContainerAtomRead(ContainerBox container) throws ParserException {
     if (container.type == Mp4Box.TYPE_moov) {
+      JLog.d(TAG, "onContainerAtomRead --- container.type is moov, durationUs=" + durationUs);
       onMoovContainerAtomRead(container);
     } else if (container.type == Mp4Box.TYPE_moof) {
+      JLog.d(TAG, "onContainerAtomRead --- container.type is moof, durationUs=" + durationUs);
       onMoofContainerAtomRead(container);
     } else if (!containerAtoms.isEmpty()) {
+      JLog.d(TAG, "onContainerAtomRead --- push to containerAtoms, durationUs=" + durationUs);
       containerAtoms.peek().add(container);
     }
   }
@@ -811,8 +863,17 @@ public class FragmentedMp4Extractor implements Extractor {
                 formatBuilder.build());
         trackBundles.put(track.id, trackBundle);
         durationUs = max(durationUs, track.durationUs);
+        JLog.d(TAG, "onMoovContainerAtomRead --- track " + i + ": " + track + ", durationUs=" + durationUs);
       }
-      extractorOutput.endTracks();
+
+      if (durationUs == C.TIME_UNSET && (flags & FLAG_READ_DURATION_FROM_MOOF) != 0) {
+        // Trigger full-file pre-scan of MOOF to compute duration, then resume.
+        shouldPreScanMoof = true;
+        JLog.w(TAG, "onMoovContainerAtomRead --- durationUs is unset, will pre-scan moof for duration");
+      } else {
+        extractorOutput.endTracks();
+      }
+      JLog.d(TAG, "onMoovContainerAtomRead --- extractorOutput end --- " + trackBundles.size());
     } else {
       checkState(trackBundles.size() == trackCount);
       for (int i = 0; i < trackCount; i++) {
@@ -824,6 +885,7 @@ public class FragmentedMp4Extractor implements Extractor {
       }
     }
   }
+
 
   @Nullable
   protected Track modifyTrack(@Nullable Track track) {
@@ -1776,6 +1838,7 @@ public class FragmentedMp4Extractor implements Extractor {
             reorderingBufferQueue.add(sampleTimeUs, nalUnitWithoutHeaderBuffer);
 
             if ((trackBundle.getCurrentSampleFlags() & C.BUFFER_FLAG_END_OF_STREAM) != 0) {
+              JLog.e(TAG, "readSample --- BUFFER_FLAG_END_OF_STREAM");
               reorderingBufferQueue.flush();
             }
           } else {
