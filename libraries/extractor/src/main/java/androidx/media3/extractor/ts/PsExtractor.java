@@ -21,6 +21,7 @@ import androidx.media3.common.C;
 import androidx.media3.common.MimeTypes;
 import androidx.media3.common.ParserException;
 import androidx.media3.common.util.Assertions;
+import androidx.media3.common.util.JLog;
 import androidx.media3.common.util.ParsableBitArray;
 import androidx.media3.common.util.ParsableByteArray;
 import androidx.media3.common.util.TimestampAdjuster;
@@ -33,6 +34,8 @@ import androidx.media3.extractor.PositionHolder;
 import androidx.media3.extractor.SeekMap;
 import androidx.media3.extractor.ts.TsPayloadReader.TrackIdGenerator;
 import java.io.IOException;
+import java.util.Arrays;
+
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
@@ -94,32 +97,41 @@ public final class PsExtractor implements Extractor {
     byte[] scratch = new byte[14];
     input.peekFully(scratch, 0, 14);
 
+    JLog.d("PsExtractor, Full header: " + Arrays.toString(scratch));
+
     // Verify the PACK_START_CODE for the first 4 bytes
     if (PACK_START_CODE
         != (((scratch[0] & 0xFF) << 24)
             | ((scratch[1] & 0xFF) << 16)
             | ((scratch[2] & 0xFF) << 8)
             | (scratch[3] & 0xFF))) {
+      JLog.d("PsExtractor , failed to find PACK_START_CODE");
       return false;
     }
     // Verify the 01xxx1xx marker on the 5th byte
     if ((scratch[4] & 0xC4) != 0x44) {
+      JLog.d("PsExtractor , failed to find 01xxx1xx marker");
       return false;
     }
+
     // Verify the xxxxx1xx marker on the 7th byte
     if ((scratch[6] & 0x04) != 0x04) {
+      JLog.d("PsExtractor , failed to find xxxxx1xx marker");
       return false;
     }
     // Verify the xxxxx1xx marker on the 9th byte
     if ((scratch[8] & 0x04) != 0x04) {
+        JLog.d("PsExtractor , failed to find xxxxx1xx marker");
       return false;
     }
     // Verify the xxxxxxx1 marker on the 10th byte
     if ((scratch[9] & 0x01) != 0x01) {
+      JLog.d("PsExtractor , failed to find xxxxxxx1 marker");
       return false;
     }
     // Verify the xxxxxx11 marker on the 13th byte
     if ((scratch[12] & 0x03) != 0x03) {
+        JLog.d("PsExtractor , failed to find xxxxxx11 marker");
       return false;
     }
     // Read the stuffing length from the 14th byte (last 3 bits)
@@ -127,6 +139,7 @@ public final class PsExtractor implements Extractor {
     input.advancePeekPosition(packStuffingLength);
     // Now check that the next 3 bytes are the beginning of an MPEG start code
     input.peekFully(scratch, 0, 3);
+    JLog.d("PsExtractor , sniffed finally");
     return (PACKET_START_CODE_PREFIX
         == (((scratch[0] & 0xFF) << 16) | ((scratch[1] & 0xFF) << 8) | (scratch[2] & 0xFF)));
   }

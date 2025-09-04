@@ -81,7 +81,8 @@ public final class Mp3Extractor implements Extractor {
         FLAG_ENABLE_CONSTANT_BITRATE_SEEKING,
         FLAG_ENABLE_CONSTANT_BITRATE_SEEKING_ALWAYS,
         FLAG_ENABLE_INDEX_SEEKING,
-        FLAG_DISABLE_ID3_METADATA
+        FLAG_DISABLE_ID3_METADATA,
+        FLAG_SNIFF_CHECK_MPEGPS,
       })
   public @interface Flags {}
 
@@ -127,6 +128,11 @@ public final class Mp3Extractor implements Extractor {
    * required.
    */
   public static final int FLAG_DISABLE_ID3_METADATA = 1 << 3;
+
+  /**
+   * Flag to enable checking for MPEG-PS files. If the input file is detected to be an MPEG-PS file,
+   */
+  public static final int FLAG_SNIFF_CHECK_MPEGPS = 1 << 4;
 
   private static final String TAG = "Mp3Extractor";
 
@@ -223,9 +229,40 @@ public final class Mp3Extractor implements Extractor {
 
   @Override
   public boolean sniff(ExtractorInput input) throws IOException {
-//    androidx.media3.common.util.JLog.d("jianjun", "sniff: ", new Throwable());
+    if (((flags & FLAG_SNIFF_CHECK_MPEGPS) != 0) && isMpegPsFile(input)) {
+      JLog.d("Mp3Extractor --- sniff --- isMpegPsFile true");
+      return false;
+    }
     return synchronize(input, true);
   }
+
+  private boolean isMpegPsFile(ExtractorInput input) throws IOException {
+    byte[] header = new byte[16];
+    input.peekFully(header, 0, 16);
+
+    // 0x000001BA (PACK_START_CODE)
+    if (header[0] == 0x00 && header[1] == 0x00 &&
+        header[2] == 0x01 && header[3] == (byte)0xBA) {
+      JLog.d("Mp3Extractor --- isMpegPsFile --- PACK_START_CODE");
+      return true;
+    }
+
+    // 0x000001BB (SYSTEM_HEADER_START_CODE)
+    if (header[0] == 0x00 && header[1] == 0x00 &&
+        header[2] == 0x01 && header[3] == (byte)0xBB) {
+      JLog.d("Mp3Extractor --- isMpegPsFile --- SYSTEM_HEADER_START_CODE");
+        return true;
+    }
+
+    // 0x000001B3 (SEQUENCE_HEADER_CODE)
+    if (header[0] == 0x00 && header[1] == 0x00 &&
+        header[2] == 0x01 && header[3] == (byte)0xB3) {
+      JLog.d("Mp3Extractor --- isMpegPsFile --- SEQUENCE_HEADER_CODE");
+        return true;
+    }
+
+    return false;
+}
 
   @Override
   public void init(ExtractorOutput output) {
