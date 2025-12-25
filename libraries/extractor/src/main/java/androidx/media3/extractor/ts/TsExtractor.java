@@ -100,7 +100,7 @@ public final class TsExtractor implements Extractor {
   @Target(TYPE_USE)
   @IntDef(
       flag = true,
-      value = {FLAG_EMIT_RAW_SUBTITLE_DATA})
+      value = {FLAG_EMIT_RAW_SUBTITLE_DATA ,FLAG_FEATURE_SUPPORT_DVHS})
   public @interface Flags {}
 
   /**
@@ -108,6 +108,8 @@ public final class TsExtractor implements Extractor {
    * transcoded to {@link MimeTypes#APPLICATION_MEDIA3_CUES} during extraction.
    */
   public static final int FLAG_EMIT_RAW_SUBTITLE_DATA = 1;
+
+  public static final int FLAG_FEATURE_SUPPORT_DVHS = 0x10;
 
   /**
    * @deprecated Use {@link #newFactory(SubtitleParser.Factory)} instead.
@@ -119,8 +121,14 @@ public final class TsExtractor implements Extractor {
             new TsExtractor(FLAG_EMIT_RAW_SUBTITLE_DATA, SubtitleParser.Factory.UNSUPPORTED)
           };
 
+  public static final int TS_PACKET_SIZE_STANDARD = 188;  // 标准 MPEG-2 TS
+  public static final int TS_PACKET_SIZE_DVHS = 192;  // DVH-S, 相比标准, 在最后增加了 4 字节时间戳
+  public static final int TS_DVH_TIMESTAMP_SIZE = 4;  // DVH-S 格式的时间戳大小
+  private boolean isSupportDvhs = false;
+
+  private int tsPacketSize = TS_PACKET_SIZE_STANDARD;
   public static final int TS_PACKET_SIZE = 188;
-  public static final int DEFAULT_TIMESTAMP_SEARCH_BYTES = 600 * TS_PACKET_SIZE;
+  public static int DEFAULT_TIMESTAMP_SEARCH_BYTES = 600 * TS_PACKET_SIZE;
 
   public static final int TS_STREAM_TYPE_MPA = 0x03;
   public static final int TS_STREAM_TYPE_MPA_LSF = 0x04;
@@ -348,19 +356,54 @@ public final class TsExtractor implements Extractor {
     output = ExtractorOutput.PLACEHOLDER;
     pcrPid = -1;
     resetPayloadReaders();
+    isSupportDvhs = (extractorFlags & FLAG_FEATURE_SUPPORT_DVHS) != 0;
+    if (isSupportDvhs) {
+        //reset the TS_PACKET_SIZE and DEFAULT_TIMESTAMP_SEARCH_BYTES
+        setPacketSize(TS_PACKET_SIZE_STANDARD);
+    }
   }
 
   // Extractor implementation.
 
   @Override
   public boolean sniff(ExtractorInput input) throws IOException {
+    // Try standard TS packet size first.
+    int packetSize = TS_PACKET_SIZE_STANDARD;
+    if (sniff(input, packetSize)) {
+      if (isSupportDvhs) {
+        setPacketSize(packetSize);
+      }
+      return true;
+    }
+
+    if (!isSupportDvhs) {
+      return false;
+    }
+    // If that fails, try DVH-S packet size.
+    packetSize = TS_PACKET_SIZE_DVHS;
+    if (sniff(input, packetSize)) {
+        setPacketSize(packetSize);
+      return true;
+    }
+    return false;
+  }
+
+  private void setPacketSize(int packetSize) {
+      tsPacketSize = packetSize;
+      DEFAULT_TIMESTAMP_SEARCH_BYTES = 600 * tsPacketSize;
+      if (durationReader != null) {
+        durationReader.setPacketSize(tsPacketSize);
+      }
+  }
+
+  private boolean sniff(ExtractorInput input, int packetSize) throws IOException {
     byte[] buffer = tsPacketBuffer.getData();
-    input.peekFully(buffer, 0, TS_PACKET_SIZE * SNIFF_TS_PACKET_COUNT);
-    for (int startPosCandidate = 0; startPosCandidate < TS_PACKET_SIZE; startPosCandidate++) {
+    input.peekFully(buffer, 0, packetSize * SNIFF_TS_PACKET_COUNT);
+    for (int startPosCandidate = 0; startPosCandidate < packetSize; startPosCandidate++) {
       // Try to identify at least SNIFF_TS_PACKET_COUNT packets starting with TS_SYNC_BYTE.
       boolean isSyncBytePatternCorrect = true;
       for (int i = 0; i < SNIFF_TS_PACKET_COUNT; i++) {
-        if (buffer[startPosCandidate + i * TS_PACKET_SIZE] != TS_SYNC_BYTE) {
+        if (buffer[startPosCandidate + i * packetSize] != TS_SYNC_BYTE) {
           isSyncBytePatternCorrect = false;
           break;
         }
@@ -521,7 +564,8 @@ public final class TsExtractor implements Extractor {
     // Read the payload.
     boolean wereTracksEnded = tracksEnded;
     if (shouldConsumePacketPayload(pid)) {
-      tsPacketBuffer.setLimit(endOfPacket);
+      int offset = (tsPacketSize == TS_PACKET_SIZE_DVHS)? TS_DVH_TIMESTAMP_SIZE : 0;
+      tsPacketBuffer.setLimit(endOfPacket - offset);
       payloadReader.consume(tsPacketBuffer, packetHeaderFlags);
       tsPacketBuffer.setLimit(limit);
     }
@@ -548,7 +592,8 @@ public final class TsExtractor implements Extractor {
                 durationReader.getDurationUs(),
                 inputLength,
                 pcrPid,
-                timestampSearchBytes);
+                timestampSearchBytes,
+                tsPacketSize);
         output.seekMap(tsBinarySearchSeeker.getSeekMap());
       } else {
         output.seekMap(new SeekMap.Unseekable(durationReader.getDurationUs()));
@@ -559,7 +604,7 @@ public final class TsExtractor implements Extractor {
   private boolean fillBufferWithAtLeastOnePacket(ExtractorInput input) throws IOException {
     byte[] data = tsPacketBuffer.getData();
     // Shift bytes to the start of the buffer if there isn't enough space left at the end.
-    if (BUFFER_SIZE - tsPacketBuffer.getPosition() < TS_PACKET_SIZE) {
+    if (BUFFER_SIZE - tsPacketBuffer.getPosition() < tsPacketSize) {
       int bytesLeft = tsPacketBuffer.bytesLeft();
       if (bytesLeft > 0) {
         System.arraycopy(data, tsPacketBuffer.getPosition(), data, 0, bytesLeft);
@@ -567,7 +612,7 @@ public final class TsExtractor implements Extractor {
       tsPacketBuffer.reset(data, bytesLeft);
     }
     // Read more bytes until we have at least one packet.
-    while (tsPacketBuffer.bytesLeft() < TS_PACKET_SIZE) {
+    while (tsPacketBuffer.bytesLeft() < tsPacketSize) {
       int limit = tsPacketBuffer.limit();
       int read = input.read(data, limit, BUFFER_SIZE - limit);
       if (read == C.RESULT_END_OF_INPUT) {
@@ -592,10 +637,10 @@ public final class TsExtractor implements Extractor {
     // Discard all bytes before the sync byte.
     // If sync byte is not found, this means discard the whole buffer.
     tsPacketBuffer.setPosition(syncBytePosition);
-    int endOfPacket = syncBytePosition + TS_PACKET_SIZE;
+    int endOfPacket = syncBytePosition + tsPacketSize;
     if (endOfPacket > limit) {
       bytesSinceLastSync += syncBytePosition - searchStart;
-      if (mode == MODE_HLS && bytesSinceLastSync > TS_PACKET_SIZE * 2) {
+      if (mode == MODE_HLS && bytesSinceLastSync > tsPacketSize * 2) {
         throw ParserException.createForMalformedContainer(
             "Cannot find sync byte. Most likely not a Transport Stream.", /* cause= */ null);
       }

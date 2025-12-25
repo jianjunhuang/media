@@ -34,6 +34,9 @@ import androidx.media3.container.ParsableNalUnitBitArray;
 import androidx.media3.extractor.ExtractorOutput;
 import androidx.media3.extractor.TrackOutput;
 import androidx.media3.extractor.ts.TsPayloadReader.TrackIdGenerator;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -70,6 +73,12 @@ public final class H264Reader implements ElementaryStreamReader {
 
   // Scratch variables to avoid allocations.
   private final ParsableByteArray seiWrapper;
+
+  // DEBUG: H264 data dump
+  private static final boolean ENABLE_H264_DUMP = false;
+  private static final String DUMP_FILE_PATH = "/sdcard/Download/h264_dump.264";
+  @Nullable private FileOutputStream dumpOutputStream;
+  private int dumpPacketCount = 0;
 
   /**
    * @param seiReader An SEI reader for consuming closed caption channels.
@@ -109,6 +118,41 @@ public final class H264Reader implements ElementaryStreamReader {
     if (sampleReader != null) {
       sampleReader.reset();
     }
+    //closeDumpFile();
+  }
+
+  private void initDumpFile() {
+    if (!ENABLE_H264_DUMP || dumpOutputStream != null) {
+      return;
+    }
+    try {
+      File dumpFile = new File(DUMP_FILE_PATH);
+      File parentDir = dumpFile.getParentFile();
+      if (parentDir != null && !parentDir.exists()) {
+        parentDir.mkdirs();
+      }
+      dumpOutputStream = new FileOutputStream(dumpFile, false);
+      androidx.media3.common.util.JLog.i("H264Reader", "H264 dump file created: " + DUMP_FILE_PATH);
+    } catch (IOException e) {
+      androidx.media3.common.util.JLog.e("H264Reader", "Failed to create H264 dump file", e);
+      dumpOutputStream = null;
+    }
+  }
+
+  private void closeDumpFile() {
+    if (dumpOutputStream != null) {
+      try {
+        dumpOutputStream.flush();
+        dumpOutputStream.close();
+        androidx.media3.common.util.JLog.i("H264Reader", 
+            "H264 dump file closed. Total packets: " + dumpPacketCount);
+      } catch (IOException e) {
+        androidx.media3.common.util.JLog.e("H264Reader", "Failed to close H264 dump file", e);
+      } finally {
+        dumpOutputStream = null;
+        dumpPacketCount = 0;
+      }
+    }
   }
 
   @Override
@@ -133,6 +177,46 @@ public final class H264Reader implements ElementaryStreamReader {
     int offset = data.getPosition();
     int limit = data.limit();
     byte[] dataArray = data.getData();
+
+    // DEBUG: Dump H264 data to file
+    if (ENABLE_H264_DUMP) {
+      initDumpFile();
+      if (dumpOutputStream != null) {
+        try {
+          int dataSize = data.bytesLeft();
+          dumpOutputStream.write(dataArray, offset, dataSize);
+          dumpOutputStream.flush();
+          dumpPacketCount++;
+          
+          if (dumpPacketCount <= 10 || dumpPacketCount % 100 == 0) {
+            StringBuilder debug = new StringBuilder();
+            debug.append(String.format("PES->H264 [%d]: size=%d, first16bytes=[",
+                dumpPacketCount, dataSize));
+            
+            int dumpLen = Math.min(16, dataSize);
+            for (int i = 0; i < dumpLen; i++) {
+              debug.append(String.format("%02X ", dataArray[offset + i] & 0xFF));
+            }
+            debug.append("]");
+            
+            if (dataSize >= 4) {
+              if ((dataArray[offset] == 0 && dataArray[offset + 1] == 0 && 
+                   dataArray[offset + 2] == 0 && dataArray[offset + 3] == 1) ||
+                  (dataArray[offset] == 0 && dataArray[offset + 1] == 0 && 
+                   dataArray[offset + 2] == 1)) {
+                debug.append(" ✓NAL_START");
+              } else {
+                debug.append(" ✗NO_START_CODE");
+              }
+            }
+            
+            androidx.media3.common.util.JLog.d("H264Reader", debug.toString());
+          }
+        } catch (IOException e) {
+          androidx.media3.common.util.JLog.e("H264Reader", "Failed to dump H264 data", e);
+        }
+      }
+    }
 
     // Append the data to the buffer.
     totalBytesWritten += data.bytesLeft();
@@ -231,6 +315,14 @@ public final class H264Reader implements ElementaryStreamReader {
                   spsData.profileIdc,
                   spsData.constraintsFlagsAndReservedZero2Bits,
                   spsData.levelIdc);
+
+          if (ENABLE_H264_DUMP) {
+            // DEBUG: 打印 SPS/PPS 信息
+            androidx.media3.common.util.JLog.i("H264Reader",
+                    String.format("✓ Format configured: %dx%d, codec=%s, spsLen=%d, ppsLen=%d",
+                            spsData.width, spsData.height, codecs, sps.nalLength, pps.nalLength));
+          }
+
           output.format(
               new Format.Builder()
                   .setId(formatId)

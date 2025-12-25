@@ -40,10 +40,10 @@ public final class TsUtil {
    * @param searchPosition The position to check for a TS packet start.
    * @return Whether a TS packet starts at {@code searchPosition}.
    */
-  public static boolean isStartOfTsPacket(byte[] data, int start, int limit, int searchPosition) {
+  public static boolean isStartOfTsPacket(byte[] data, int start, int limit, int searchPosition, int packetSize) {
     int consecutiveSyncByteCount = 0;
     for (int i = -4; i <= 4; i++) {
-      int currentPosition = searchPosition + i * TsExtractor.TS_PACKET_SIZE;
+      int currentPosition = searchPosition + i * packetSize;
       if (currentPosition < start
           || currentPosition >= limit
           || data[currentPosition] != TsExtractor.TS_SYNC_BYTE) {

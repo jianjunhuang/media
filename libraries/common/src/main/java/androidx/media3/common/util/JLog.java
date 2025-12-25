@@ -230,6 +230,10 @@ public final class JLog {
     w(TAG, message, throwable);
   }
 
+  @Pure
+  public static void w(String message) {
+      w(TAG, message);
+  }
 
   /**
    * Logs a debug-level message with an optional associated {@link Throwable}.
@@ -322,6 +326,20 @@ public final class JLog {
         logger.e(tag, message, /* throwable= */ null);
       }
     }
+  }
+
+  /**
+   * Logs an error-level message.
+   *
+   * @param message The message.
+   */
+  @Pure
+  public static void e(String message) {
+      synchronized (lock) {
+          if (logLevel <= LOG_LEVEL_ERROR) {
+              logger.e(TAG, message, /* throwable= */ null);
+          }
+      }
   }
 
   /**

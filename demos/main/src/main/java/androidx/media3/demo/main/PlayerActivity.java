@@ -295,8 +295,8 @@ public class PlayerActivity extends AppCompatActivity
 //      setRenderersFactory(
 //          playerBuilder, intent.getBooleanExtra(IntentUtil.PREFER_EXTENSION_DECODERS_EXTRA, false));
       setRenderersFactory(
-          playerBuilder, false);
-      playerBuilder.setTrackSelector(new DefaultTrackSelector(this) {
+          playerBuilder, true);
+      DefaultTrackSelector trackSelector = new DefaultTrackSelector(this) {
 
         @Nullable
         @Override
@@ -308,7 +308,14 @@ public class PlayerActivity extends AppCompatActivity
           }
           return super.selectAudioTrack(mappedTrackInfo, rendererFormatSupports, rendererMixedMimeTypeAdaptationSupports, params);
         }
-      });
+      };
+      //TODO
+      trackSelector.setParameters(
+              trackSelector.getParameters().buildUpon()
+                      .setTunnelingEnabled(false)
+                              .build()
+      );
+      playerBuilder.setTrackSelector(trackSelector);
       player = playerBuilder.build();
       player.setTrackSelectionParameters(trackSelectionParameters);
       player.addListener(new PlayerEventListener());
@@ -353,6 +360,7 @@ public class PlayerActivity extends AppCompatActivity
                 .setDataSourceFactory(dataSourceFactory));
     DefaultExtractorsFactory extractorsFactory = new DefaultExtractorsFactory();
     extractorsFactory.setTsExtractorMode(TsExtractor.MODE_MULTI_PMT);
+    extractorsFactory.setTsSupportDvhs(true);
     extractorsFactory.setMp4ExtractorFlags(Mp4Extractor.FLAG_DETACH_MP3_LAYER);
     extractorsFactory.setFragmentedMp4ExtractorFlags(FragmentedMp4Extractor.FLAG_READ_DURATION_FROM_MOOF);
     extractorsFactory.setMp3ExtractorFlags(Mp3Extractor.FLAG_SNIFF_CHECK_MPEGPS);

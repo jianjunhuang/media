@@ -154,6 +154,8 @@ public final class DefaultExtractorsFactory implements ExtractorsFactory {
   @Nullable private ImmutableList<Format> tsSubtitleFormats;
   private int tsTimestampSearchBytes;
   private boolean textTrackTranscodingEnabled;
+
+  private boolean tsSupportDvhs = false;
   private SubtitleParser.Factory subtitleParserFactory;
   private @C.VideoCodecFlags int codecsToParseWithinGopSampleDependencies;
   private @JpegExtractor.Flags int jpegFlags;
@@ -373,6 +375,16 @@ public final class DefaultExtractorsFactory implements ExtractorsFactory {
     return experimentalSetTextTrackTranscodingEnabled(textTrackTranscodingEnabled);
   }
 
+  /**
+   * Sets whether TsExtractor should support DVH-S
+   * @param tsSupportDvhs Whether to support DVH-S
+   * @return The factory, for convenience.
+   */
+  public synchronized DefaultExtractorsFactory setTsSupportDvhs(boolean tsSupportDvhs) {
+    this.tsSupportDvhs = tsSupportDvhs;
+    return this;
+  }
+
   @Deprecated
   @Override
   public synchronized DefaultExtractorsFactory experimentalSetTextTrackTranscodingEnabled(
@@ -538,7 +550,7 @@ public final class DefaultExtractorsFactory implements ExtractorsFactory {
         extractors.add(
             new TsExtractor(
                 tsMode,
-                (textTrackTranscodingEnabled ? 0 : TsExtractor.FLAG_EMIT_RAW_SUBTITLE_DATA),
+                (textTrackTranscodingEnabled ? 0 : TsExtractor.FLAG_EMIT_RAW_SUBTITLE_DATA) | (tsSupportDvhs ? TsExtractor.FLAG_FEATURE_SUPPORT_DVHS : 0),
                 subtitleParserFactory,
                 new TimestampAdjuster(0),
                 new DefaultTsPayloadReaderFactory(tsFlags, tsSubtitleFormats),

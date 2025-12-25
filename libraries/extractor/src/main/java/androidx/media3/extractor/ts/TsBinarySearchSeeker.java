@@ -36,24 +36,27 @@ import java.io.IOException;
 /* package */ final class TsBinarySearchSeeker extends BinarySearchSeeker {
 
   private static final long SEEK_TOLERANCE_US = 100_000;
-  private static final int MINIMUM_SEARCH_RANGE_BYTES = 5 * TsExtractor.TS_PACKET_SIZE;
+  private int packetSize;
+  //private static final int MINIMUM_SEARCH_RANGE_BYTES = 5 * TsExtractor.TS_PACKET_SIZE;
 
   public TsBinarySearchSeeker(
       TimestampAdjuster pcrTimestampAdjuster,
       long streamDurationUs,
       long inputLength,
       int pcrPid,
-      int timestampSearchBytes) {
+      int timestampSearchBytes,
+      int packetSize) {
     super(
         new DefaultSeekTimestampConverter(),
-        new TsPcrSeeker(pcrPid, pcrTimestampAdjuster, timestampSearchBytes),
+        new TsPcrSeeker(pcrPid, pcrTimestampAdjuster, timestampSearchBytes, packetSize),
         streamDurationUs,
         /* floorTimePosition= */ 0,
         /* ceilingTimePosition= */ streamDurationUs + 1,
         /* floorBytePosition= */ 0,
         /* ceilingBytePosition= */ inputLength,
-        /* approxBytesPerFrame= */ TsExtractor.TS_PACKET_SIZE,
-        MINIMUM_SEARCH_RANGE_BYTES);
+        /* approxBytesPerFrame= */ packetSize,
+        5 * packetSize);
+    this.packetSize = packetSize;
   }
 
   /**
@@ -72,9 +75,12 @@ import java.io.IOException;
     private final int pcrPid;
     private final int timestampSearchBytes;
 
+    private final int packetSize;
+
     public TsPcrSeeker(
-        int pcrPid, TimestampAdjuster pcrTimestampAdjuster, int timestampSearchBytes) {
+        int pcrPid, TimestampAdjuster pcrTimestampAdjuster, int timestampSearchBytes, int packetSize) {
       this.pcrPid = pcrPid;
+      this.packetSize = packetSize;
       this.pcrTimestampAdjuster = pcrTimestampAdjuster;
       this.timestampSearchBytes = timestampSearchBytes;
       packetBuffer = new ParsableByteArray();
@@ -100,10 +106,10 @@ import java.io.IOException;
       long endOfLastPacketPosition = C.INDEX_UNSET;
       long lastPcrTimeUsInRange = C.TIME_UNSET;
 
-      while (packetBuffer.bytesLeft() >= TsExtractor.TS_PACKET_SIZE) {
+      while (packetBuffer.bytesLeft() >= packetSize) {
         int startOfPacket =
             TsUtil.findSyncBytePosition(packetBuffer.getData(), packetBuffer.getPosition(), limit);
-        int endOfPacket = startOfPacket + TsExtractor.TS_PACKET_SIZE;
+        int endOfPacket = startOfPacket + packetSize;
         if (endOfPacket > limit) {
           break;
         }
