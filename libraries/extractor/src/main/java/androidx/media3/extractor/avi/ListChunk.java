@@ -40,6 +40,7 @@ import com.google.common.collect.ImmutableList;
         aviChunk = createBox(type, currentTrackType, body);
       }
       if (aviChunk != null) {
+        aviChunk.log();
         if (aviChunk.getType() == AviExtractor.FOURCC_strh) {
           currentTrackType = ((AviStreamHeaderChunk) aviChunk).getTrackType();
         }

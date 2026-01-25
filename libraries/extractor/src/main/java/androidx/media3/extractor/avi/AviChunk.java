@@ -24,4 +24,15 @@ package androidx.media3.extractor.avi;
 
   /** Returns the chunk type fourcc. */
   int getType();
+
+  static String getChunkName(int type) {
+    return "" + (char) (type & 0xFF)
+            + (char) ((type >> 8) & 0xFF)
+            + (char) ((type >> 16) & 0xFF)
+            + (char) ((type >> 24) & 0xFF);
+  }
+
+  default void log() {
+    androidx.media3.common.util.JLog.d("AviChunk", "chunkType=" + getChunkName(getType()));
+  }
 }

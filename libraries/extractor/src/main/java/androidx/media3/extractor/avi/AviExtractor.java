@@ -25,6 +25,7 @@ import androidx.media3.common.Format;
 import androidx.media3.common.MimeTypes;
 import androidx.media3.common.ParserException;
 import androidx.media3.common.util.Assertions;
+import androidx.media3.common.util.JLog;
 import androidx.media3.common.util.Log;
 import androidx.media3.common.util.ParsableByteArray;
 import androidx.media3.common.util.UnstableApi;
@@ -220,6 +221,7 @@ public final class AviExtractor implements Extractor {
     }
     switch (state) {
       case STATE_SKIPPING_TO_HDRL:
+        JLog.d(TAG, "read -- STATE_SKIPPING_TO_HDRL");
         // Check for RIFF and AVI fourcc's just in case the caller did not sniff, in order to
         // provide a meaningful error if the input is not an AVI file.
         if (sniff(input)) {
@@ -231,6 +233,7 @@ public final class AviExtractor implements Extractor {
         state = STATE_READING_HDRL_HEADER;
         return RESULT_CONTINUE;
       case STATE_READING_HDRL_HEADER:
+        JLog.d(TAG, "read -- STATE_READING_HDRL_HEADER");
         input.readFully(scratch.getData(), /* offset= */ 0, /* length= */ 12);
         scratch.setPosition(0);
         chunkHeaderHolder.populateWithListHeaderFrom(scratch);
@@ -243,6 +246,7 @@ public final class AviExtractor implements Extractor {
         state = STATE_READING_HDRL_BODY;
         return RESULT_CONTINUE;
       case STATE_READING_HDRL_BODY:
+        JLog.d(TAG, "read -- STATE_READING_HDRL_BODY");
         // hdrlSize includes the LIST type (hdrl), so we subtract 4 to the size.
         int bytesToRead = hdrlSize - 4;
         ParsableByteArray hdrlBody = new ParsableByteArray(bytesToRead);
@@ -251,6 +255,7 @@ public final class AviExtractor implements Extractor {
         state = STATE_FINDING_MOVI_HEADER;
         return RESULT_CONTINUE;
       case STATE_FINDING_MOVI_HEADER:
+        JLog.d(TAG, "read -- STATE_FINDING_MOVI_HEADER");
         if (moviStart != C.INDEX_UNSET && input.getPosition() != moviStart) {
           pendingReposition = moviStart;
           return RESULT_CONTINUE;
@@ -290,6 +295,21 @@ public final class AviExtractor implements Extractor {
         state = STATE_READING_SAMPLES;
         return RESULT_CONTINUE;
       case STATE_FINDING_IDX1_HEADER:
+        //JLog.d(TAG, "read -- STATE_FINDING_IDX1_HEADER");
+        if (input.getPosition() + scratch.limit() > input.getLength()) {
+          JLog.e("read -- STATE_FINDING_IDX1_HEADER ====================");
+          //TODO huangjianjun
+          //plan 1: build with unseekable
+          seekMapHasBeenOutput = true;
+          extractorOutput.seekMap(new SeekMap.Unseekable(durationUs));
+          state = STATE_READING_SAMPLES;
+          pendingReposition = moviStart;
+          //TODO huangjianjun 如果是包含 H264 的数据，走 readSample 逻辑构建 seekmap
+          //plan 2: read all sample
+          for (ChunkReader reader : chunkReaders) {
+          }
+          return RESULT_CONTINUE;
+        }
         input.readFully(scratch.getData(), /* offset= */ 0, /* length= */ 8);
         scratch.setPosition(0);
         int idx1Fourcc = scratch.readLittleEndianInt();
@@ -303,13 +323,16 @@ public final class AviExtractor implements Extractor {
         }
         return RESULT_CONTINUE;
       case STATE_READING_IDX1_BODY:
+        JLog.d(TAG, "read -- STATE_READING_IDX1_BODY");
         ParsableByteArray idx1Body = new ParsableByteArray(idx1BodySize);
         input.readFully(idx1Body.getData(), /* offset= */ 0, /* length= */ idx1BodySize);
+        //TODO huangjianjun
         parseIdx1Body(idx1Body);
         state = STATE_READING_SAMPLES;
         pendingReposition = moviStart;
         return RESULT_CONTINUE;
       case STATE_READING_SAMPLES:
+        //JLog.d(TAG, "read -- STATE_READING_SAMPLES");
         return readMoviChunks(input);
       default:
         throw new AssertionError(); // Should never happen.
@@ -379,6 +402,8 @@ public final class AviExtractor implements Extractor {
           /* message= */ "AviHeader not found", /* cause= */ null);
     }
     this.aviHeader = aviHeader;
+    JLog.d(TAG, "parseHdrlBody --- AviMainHeaderChunk: flags=" + aviHeader.flags + ", totalFrames=" + aviHeader.totalFrames
+            + ", streams=" + aviHeader.streams + ", frameDurationUs=" + aviHeader.frameDurationUs);
     // This is usually wrong, so it will be overwritten by video if present
     durationUs = aviHeader.totalFrames * (long) aviHeader.frameDurationUs;
     ArrayList<ChunkReader> chunkReaderList = new ArrayList<>();
@@ -497,7 +522,7 @@ public final class AviExtractor implements Extractor {
 
   @Nullable
   private ChunkReader processStreamList(ListChunk streamList, int streamId) {
-//    androidx.media3.common.util.JLog.d("jianjun", "processStreamList streamId = " + streamId, new Throwable());
+    JLog.d(TAG, "processStreamList streamId = " + streamId);
     AviStreamHeaderChunk aviStreamHeaderChunk = streamList.getChild(AviStreamHeaderChunk.class);
     StreamFormatChunk streamFormatChunk = streamList.getChild(StreamFormatChunk.class);
     if (aviStreamHeaderChunk == null) {
@@ -510,7 +535,14 @@ public final class AviExtractor implements Extractor {
     }
     long durationUs = aviStreamHeaderChunk.getDurationUs();
     Format streamFormat = streamFormatChunk.format;
-//    androidx.media3.common.util.JLog.d("jianjun", "processStreamList streamFormat = " + streamFormat, new Throwable());
+    JLog.d(TAG, "AviStreamHeaderChunk: streamType=" + Integer.toHexString(aviStreamHeaderChunk.streamType)
+            + ", initialFrames=" + aviStreamHeaderChunk.initialFrames
+            + ", scale=" + aviStreamHeaderChunk.scale
+            + ", rate=" + aviStreamHeaderChunk.rate
+            + ", length=" + aviStreamHeaderChunk.length
+            + ", suggestedBufferSize=" + aviStreamHeaderChunk.suggestedBufferSize
+            + ", sampleSize=" + aviStreamHeaderChunk.sampleSize);
+    JLog.d(TAG, "StreamFormatChunk: " + streamFormat);
     Format.Builder builder = streamFormat.buildUpon();
     builder.setId(streamId);
     int suggestedBufferSize = aviStreamHeaderChunk.suggestedBufferSize;
@@ -519,6 +551,7 @@ public final class AviExtractor implements Extractor {
     }
     StreamNameChunk streamName = streamList.getChild(StreamNameChunk.class);
     if (streamName != null) {
+      JLog.d(TAG, "StreamNameChunk: name=" + streamName.name);
       builder.setLabel(streamName.name);
     }
     int trackType = MimeTypes.getTrackType(streamFormat.sampleMimeType);
