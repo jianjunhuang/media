@@ -361,6 +361,7 @@ public class PlayerActivity extends AppCompatActivity
     DefaultExtractorsFactory extractorsFactory = new DefaultExtractorsFactory();
     extractorsFactory.setTsExtractorMode(TsExtractor.MODE_MULTI_PMT);
     extractorsFactory.setTsSupportDvhs(true);
+    extractorsFactory.setTsEnablePTSDuration(true);
     extractorsFactory.setMp4ExtractorFlags(Mp4Extractor.FLAG_DETACH_MP3_LAYER);
     extractorsFactory.setFragmentedMp4ExtractorFlags(FragmentedMp4Extractor.FLAG_READ_DURATION_FROM_MOOF);
     extractorsFactory.setMp3ExtractorFlags(Mp3Extractor.FLAG_SNIFF_CHECK_MPEGPS);

@@ -18,6 +18,7 @@ package androidx.media3.extractor.ts;
 import static java.lang.Math.min;
 
 import androidx.media3.common.C;
+import androidx.media3.common.util.JLog;
 import androidx.media3.common.util.ParsableByteArray;
 import androidx.media3.common.util.TimestampAdjuster;
 import androidx.media3.common.util.Util;
@@ -50,21 +51,29 @@ import java.io.IOException;
 
   private long firstPcrValue;
   private long lastPcrValue;
+  private long lastPtsValue;
   private long durationUs;
 
   private int packetSize;
+  private boolean usePtsForDuration;
 
   /* package */ TsDurationReader(int timestampSearchBytes) {
     this.timestampSearchBytes = timestampSearchBytes;
     pcrTimestampAdjuster = new TimestampAdjuster(/* firstSampleTimestampUs= */ 0);
     firstPcrValue = C.TIME_UNSET;
     lastPcrValue = C.TIME_UNSET;
+    lastPtsValue = C.TIME_UNSET;
     durationUs = C.TIME_UNSET;
     packetBuffer = new ParsableByteArray();
+    JLog.d("TsDurationReader --- TsDurationReader: timestampSearchBytes=" + timestampSearchBytes);
   }
 
   public void setPacketSize(int packetSize) {
     this.packetSize = packetSize;
+  }
+
+  public void setUsePtsForDuration(boolean usePtsForDuration) {
+    this.usePtsForDuration = usePtsForDuration;
   }
 
   /** Returns true if a TS duration has been read. */
@@ -87,13 +96,22 @@ import java.io.IOException;
    */
   public @Extractor.ReadResult int readDuration(
       ExtractorInput input, PositionHolder seekPositionHolder, int pcrPid) throws IOException {
+    JLog.d("TsDurationReader --- pcrPid=" + pcrPid);
+    JLog.d("TsDurationReader --- readDuration: isDurationRead=" + isDurationRead
+        + ", isFirstPcrValueRead=" + isFirstPcrValueRead
+        + ", isLastPcrValueRead=" + isLastPcrValueRead
+        + ", firstPcrValue=" + firstPcrValue
+        + ", lastPcrValue=" + lastPcrValue
+        + ", lastPtsValue=" + lastPtsValue
+        + ", usePtsForDuration=" + usePtsForDuration);
     if (pcrPid <= 0) {
       return finishReadDuration(input);
     }
     if (!isLastPcrValueRead) {
       return readLastPcrValue(input, seekPositionHolder, pcrPid);
     }
-    if (lastPcrValue == C.TIME_UNSET) {
+    if (lastPcrValue == C.TIME_UNSET
+        && (!usePtsForDuration || lastPtsValue == C.TIME_UNSET)) {
       return finishReadDuration(input);
     }
     if (!isFirstPcrValueRead) {
@@ -104,9 +122,26 @@ import java.io.IOException;
     }
 
     long minPcrPositionUs = pcrTimestampAdjuster.adjustTsTimestamp(firstPcrValue);
+    long maxTimestamp = lastPcrValue;
+    if (usePtsForDuration) {
+      if (maxTimestamp == C.TIME_UNSET
+          || (lastPtsValue != C.TIME_UNSET && lastPtsValue > maxTimestamp)) {
+        maxTimestamp = lastPtsValue;
+      }
+    }
+    if (maxTimestamp == C.TIME_UNSET) {
+      return finishReadDuration(input);
+    }
     long maxPcrPositionUs =
-        pcrTimestampAdjuster.adjustTsTimestampGreaterThanPreviousTimestamp(lastPcrValue);
+        pcrTimestampAdjuster.adjustTsTimestampGreaterThanPreviousTimestamp(maxTimestamp);
     durationUs = maxPcrPositionUs - minPcrPositionUs;
+    JLog.d(
+        "TsDurationReader --- readDuration: "
+            + maxPcrPositionUs
+            + " - "
+            + minPcrPositionUs
+            + " --> durationUs="
+            + durationUs);
     return finishReadDuration(input);
   }
 
@@ -125,6 +160,10 @@ import java.io.IOException;
     return pcrTimestampAdjuster;
   }
 
+  public long getLastPtsValue() {
+    return lastPtsValue;
+  }
+
   private int finishReadDuration(ExtractorInput input) {
     packetBuffer.reset(Util.EMPTY_BYTE_ARRAY);
     isDurationRead = true;
@@ -135,6 +174,7 @@ import java.io.IOException;
   private int readFirstPcrValue(ExtractorInput input, PositionHolder seekPositionHolder, int pcrPid)
       throws IOException {
     int bytesToSearch = (int) min(timestampSearchBytes, input.getLength());
+    JLog.d("TsDurationReader --- readFirstPcrValue: bytesToSearch=" + bytesToSearch);
     int searchStartPosition = 0;
     if (input.getPosition() != searchStartPosition) {
       seekPositionHolder.position = searchStartPosition;
@@ -146,6 +186,7 @@ import java.io.IOException;
     input.peekFully(packetBuffer.getData(), /* offset= */ 0, bytesToSearch);
 
     firstPcrValue = readFirstPcrValueFromBuffer(packetBuffer, pcrPid);
+    JLog.d("TsDurationReader --- readFirstPcrValue: firstPcrValue=" + firstPcrValue);
     isFirstPcrValueRead = true;
     return Extractor.RESULT_CONTINUE;
   }
@@ -153,6 +194,7 @@ import java.io.IOException;
   private long readFirstPcrValueFromBuffer(ParsableByteArray packetBuffer, int pcrPid) {
     int searchStartPosition = packetBuffer.getPosition();
     int searchEndPosition = packetBuffer.limit();
+    JLog.d("TsDurationReader --- readFirstPcrValueFromBuffer: searching from " + searchStartPosition + " to " + searchEndPosition + ", pcrPid=" + pcrPid + ", packetSize=" + packetSize);
     for (int searchPosition = searchStartPosition;
         searchPosition < searchEndPosition;
         searchPosition++) {
@@ -161,6 +203,7 @@ import java.io.IOException;
       }
       long pcrValue = TsUtil.readPcrFromPacket(packetBuffer, searchPosition, pcrPid);
       if (pcrValue != C.TIME_UNSET) {
+          JLog.d("TsDurationReader --- readFirstPcrValueFromBuffer: at position " + searchPosition + ", pcrValue=" + pcrValue);
         return pcrValue;
       }
     }
@@ -172,6 +215,8 @@ import java.io.IOException;
     long inputLength = input.getLength();
     int bytesToSearch = (int) min(timestampSearchBytes, inputLength);
     long searchStartPosition = inputLength - bytesToSearch;
+    JLog.d("TsDurationReader --- readLastPcrValue: bytesToSearch=" + bytesToSearch
+        + ", searchStartPosition=" + searchStartPosition + ", inputLength=" + inputLength);
     if (input.getPosition() != searchStartPosition) {
       seekPositionHolder.position = searchStartPosition;
       return Extractor.RESULT_SEEK;
@@ -182,6 +227,8 @@ import java.io.IOException;
     input.peekFully(packetBuffer.getData(), /* offset= */ 0, bytesToSearch);
 
     lastPcrValue = readLastPcrValueFromBuffer(packetBuffer, pcrPid);
+    JLog.d("TsDurationReader --- readLastPcrValue: lastPcrValue=" + lastPcrValue);
+    JLog.d("TsDurationReader --- readLastPcrValue: lastPtsValue=" + lastPtsValue);
     isLastPcrValueRead = true;
     return Extractor.RESULT_CONTINUE;
   }
@@ -189,6 +236,21 @@ import java.io.IOException;
   private long readLastPcrValueFromBuffer(ParsableByteArray packetBuffer, int pcrPid) {
     int searchStartPosition = packetBuffer.getPosition();
     int searchEndPosition = packetBuffer.limit();
+    JLog.d("TsDurationReader --- readLastPcrValueFromBuffer: searching from " + searchStartPosition + " to " + searchEndPosition + ", pcrPid=" + pcrPid + ", packetSize=" + packetSize);
+    if (usePtsForDuration) {
+      for (int searchPosition = searchStartPosition;
+          searchPosition <= searchEndPosition - packetSize;
+          searchPosition++) {
+        if (!TsUtil.isStartOfTsPacket(
+            packetBuffer.getData(), searchStartPosition, searchEndPosition, searchPosition, packetSize)) {
+          continue;
+        }
+        long ptsValue = readPtsFromPacket(packetBuffer, searchPosition);
+        if (ptsValue != C.TIME_UNSET) {
+          lastPtsValue = ptsValue;
+        }
+      }
+    }
     // We start searching 'TsExtractor.TS_PACKET_SIZE' bytes from the end to prevent trying to read
     // from an incomplete TS packet.
     for (int searchPosition = searchEndPosition - packetSize;
@@ -200,8 +262,92 @@ import java.io.IOException;
       }
       long pcrValue = TsUtil.readPcrFromPacket(packetBuffer, searchPosition, pcrPid);
       if (pcrValue != C.TIME_UNSET) {
+        JLog.d("TsDurationReader --- readLastPcrValueFromBuffer: at position " + searchPosition + ", pcrValue=" + pcrValue);
         return pcrValue;
       }
+    }
+    return C.TIME_UNSET;
+  }
+
+  // Parses a PTS from a TS packet payload when present.
+  // TS packet layout (188 bytes typical):
+  //   [0x47][header:4 bytes]
+  //   header bits: TEI (bit23) | PUSI (bit22) | PID (13 bits) | AFC (2 bits)
+  //   AFC: 01 payload only, 10 adaptation only, 11 adaptation + payload
+  //   [adapt_len?][adaptation_field?] [payload -> PES]
+  //
+  // PES payload when PUSI=1 and prefix is 0x000001:
+  //   [00 00 01][stream_id][pes_len]
+  //   [flags1][flags2: PTS_DTS][hdr_len][PTS(5)]...
+  // PTS(5) layout (33 bits total):
+  //   b0: 0010 | PTS[32..30] | marker
+  //   b1: PTS[29..22]
+  //   b2: PTS[21..15] | marker
+  //   b3: PTS[14..7]
+  //   b4: PTS[6..0] | marker
+  private long readPtsFromPacket(ParsableByteArray packetBuffer, int startOfPacket) {
+    packetBuffer.setPosition(startOfPacket);
+    if (packetBuffer.bytesLeft() < 5) {
+      return C.TIME_UNSET;
+    }
+    int tsPacketHeader = packetBuffer.readInt();
+    if ((tsPacketHeader & 0x800000) != 0) {
+      return C.TIME_UNSET;
+    }
+    boolean payloadUnitStartIndicator = (tsPacketHeader & 0x400000) != 0;
+    int adaptationFieldControl = (tsPacketHeader & 0x30) >> 4;
+    boolean hasAdaptation = adaptationFieldControl == 2 || adaptationFieldControl == 3;
+    boolean hasPayload = adaptationFieldControl == 1 || adaptationFieldControl == 3;
+    if (!hasPayload) {
+      return C.TIME_UNSET;
+    }
+
+    if (hasAdaptation) {
+      if (packetBuffer.bytesLeft() < 1) {
+        return C.TIME_UNSET;
+      }
+      int adaptationFieldLength = packetBuffer.readUnsignedByte();
+      if (packetBuffer.bytesLeft() < adaptationFieldLength) {
+        return C.TIME_UNSET;
+      }
+      packetBuffer.skipBytes(adaptationFieldLength);
+    }
+
+    if (!payloadUnitStartIndicator) {
+      return C.TIME_UNSET;
+    }
+    if (packetBuffer.bytesLeft() < 9) {
+      return C.TIME_UNSET;
+    }
+    int prefix =
+        (packetBuffer.readUnsignedByte() << 16)
+            | (packetBuffer.readUnsignedByte() << 8)
+            | packetBuffer.readUnsignedByte();
+    if (prefix != 0x000001) {
+      return C.TIME_UNSET;
+    }
+    packetBuffer.skipBytes(1); // stream_id
+    packetBuffer.skipBytes(2); // PES_packet_length
+    if (packetBuffer.bytesLeft() < 3) {
+      return C.TIME_UNSET;
+    }
+    packetBuffer.skipBytes(1); // '10' + flags
+    int ptsDtsFlags = (packetBuffer.readUnsignedByte() >> 6) & 0x03;
+    int pesHeaderDataLength = packetBuffer.readUnsignedByte();
+    if (ptsDtsFlags == 0x02 || ptsDtsFlags == 0x03) {
+      if (packetBuffer.bytesLeft() < 5) {
+        return C.TIME_UNSET;
+      }
+      long b0 = packetBuffer.readUnsignedByte();
+      long b1 = packetBuffer.readUnsignedByte();
+      long b2 = packetBuffer.readUnsignedByte();
+      long b3 = packetBuffer.readUnsignedByte();
+      long b4 = packetBuffer.readUnsignedByte();
+      return ((b0 & 0x0EL) << 29)
+          | ((b1 & 0xFFL) << 22)
+          | ((b2 & 0xFEL) << 14)
+          | ((b3 & 0xFFL) << 7)
+          | ((b4 & 0xFEL) >> 1);
     }
     return C.TIME_UNSET;
   }

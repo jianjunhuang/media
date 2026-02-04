@@ -28,6 +28,7 @@ import androidx.media3.common.C;
 import androidx.media3.common.MimeTypes;
 import androidx.media3.common.ParserException;
 import androidx.media3.common.util.Assertions;
+import androidx.media3.common.util.JLog;
 import androidx.media3.common.util.NullableType;
 import androidx.media3.common.util.ParsableBitArray;
 import androidx.media3.common.util.ParsableByteArray;
@@ -100,7 +101,7 @@ public final class TsExtractor implements Extractor {
   @Target(TYPE_USE)
   @IntDef(
       flag = true,
-      value = {FLAG_EMIT_RAW_SUBTITLE_DATA ,FLAG_FEATURE_SUPPORT_DVHS})
+      value = {FLAG_EMIT_RAW_SUBTITLE_DATA, FLAG_FEATURE_SUPPORT_DVHS, FLAG_ENABLE_PTS_DURATION})
   public @interface Flags {}
 
   /**
@@ -110,6 +111,9 @@ public final class TsExtractor implements Extractor {
   public static final int FLAG_EMIT_RAW_SUBTITLE_DATA = 1;
 
   public static final int FLAG_FEATURE_SUPPORT_DVHS = 0x10;
+
+  // Use PTS as a fallback/extension when computing duration.
+  public static final int FLAG_ENABLE_PTS_DURATION = 0x20;
 
   /**
    * @deprecated Use {@link #newFactory(SubtitleParser.Factory)} instead.
@@ -353,6 +357,7 @@ public final class TsExtractor implements Extractor {
     tsPayloadReaders = new SparseArray<>();
     continuityCounters = new SparseIntArray();
     durationReader = new TsDurationReader(timestampSearchBytes);
+    durationReader.setUsePtsForDuration((extractorFlags & FLAG_ENABLE_PTS_DURATION) != 0);
     output = ExtractorOutput.PLACEHOLDER;
     pcrPid = -1;
     resetPayloadReaders();
@@ -585,6 +590,7 @@ public final class TsExtractor implements Extractor {
   private void maybeOutputSeekMap(long inputLength) {
     if (!hasOutputSeekMap) {
       hasOutputSeekMap = true;
+      JLog.d("TsExtractor --- maybeOutputSeekMap -> " + durationReader.getDurationUs());
       if (durationReader.getDurationUs() != C.TIME_UNSET) {
         tsBinarySearchSeeker =
             new TsBinarySearchSeeker(
