@@ -57,6 +57,18 @@ import java.io.IOException;
   private int packetSize;
   private boolean usePtsForDuration;
 
+  // Progressive search state
+  private int progressiveSearchIndex;
+  // Default TS packet size is 188 bytes, DEFAULT_TIMESTAMP_SEARCH_BYTES = 600 * 188 = 112800
+  private static final int DEFAULT_TIMESTAMP_SEARCH_BYTES = 600 * 188;
+  private static final int[] PROGRESSIVE_SEARCH_SIZES = {
+      DEFAULT_TIMESTAMP_SEARCH_BYTES,  // ~110KB (original default)
+      2 * 1024 * 1024,                  // 2MB
+      5 * 1024 * 1024,                  // 5MB
+      10 * 1024 * 1024,                 // 10MB
+      20 * 1024 * 1024                  // 20MB
+  };
+
   /* package */ TsDurationReader(int timestampSearchBytes) {
     this.timestampSearchBytes = timestampSearchBytes;
     pcrTimestampAdjuster = new TimestampAdjuster(/* firstSampleTimestampUs= */ 0);
@@ -65,7 +77,24 @@ import java.io.IOException;
     lastPtsValue = C.TIME_UNSET;
     durationUs = C.TIME_UNSET;
     packetBuffer = new ParsableByteArray();
+    progressiveSearchIndex = 0;
     JLog.d("TsDurationReader --- TsDurationReader: timestampSearchBytes=" + timestampSearchBytes);
+  }
+
+  /**
+   * Returns the search size for the current progressive search attempt.
+   * @param inputLength The total input length in bytes
+   * @return The number of bytes to search in this attempt
+   */
+  private int getProgressiveSearchSize(long inputLength) {
+    if (progressiveSearchIndex >= PROGRESSIVE_SEARCH_SIZES.length) {
+      // Fallback to configured maximum
+      return (int) min(timestampSearchBytes, inputLength);
+    }
+
+    int progressiveSize = PROGRESSIVE_SEARCH_SIZES[progressiveSearchIndex];
+    // Don't exceed configured maximum
+    return (int) min(progressiveSize, min(timestampSearchBytes, inputLength));
   }
 
   public void setPacketSize(int packetSize) {
@@ -96,6 +125,11 @@ import java.io.IOException;
    */
   public @Extractor.ReadResult int readDuration(
       ExtractorInput input, PositionHolder seekPositionHolder, int pcrPid) throws IOException {
+    // Reset progressive search index when starting a new duration read
+    if (!isLastPcrValueRead && progressiveSearchIndex == 0) {
+      JLog.d("TsDurationReader --- readDuration: starting progressive search, maxSearchBytes=" + timestampSearchBytes);
+    }
+
     JLog.d("TsDurationReader --- pcrPid=" + pcrPid);
     JLog.d("TsDurationReader --- readDuration: isDurationRead=" + isDurationRead
         + ", isFirstPcrValueRead=" + isFirstPcrValueRead
@@ -213,10 +247,13 @@ import java.io.IOException;
   private int readLastPcrValue(ExtractorInput input, PositionHolder seekPositionHolder, int pcrPid)
       throws IOException {
     long inputLength = input.getLength();
-    int bytesToSearch = (int) min(timestampSearchBytes, inputLength);
+    int bytesToSearch = getProgressiveSearchSize(inputLength);
     long searchStartPosition = inputLength - bytesToSearch;
-    JLog.d("TsDurationReader --- readLastPcrValue: bytesToSearch=" + bytesToSearch
+
+    JLog.d("TsDurationReader --- readLastPcrValue: round=" + (progressiveSearchIndex + 1)
+        + ", bytesToSearch=" + bytesToSearch + " (" + (bytesToSearch / 1024 / 1024) + "MB)"
         + ", searchStartPosition=" + searchStartPosition + ", inputLength=" + inputLength);
+
     if (input.getPosition() != searchStartPosition) {
       seekPositionHolder.position = searchStartPosition;
       return Extractor.RESULT_SEEK;
@@ -227,9 +264,35 @@ import java.io.IOException;
     input.peekFully(packetBuffer.getData(), /* offset= */ 0, bytesToSearch);
 
     lastPcrValue = readLastPcrValueFromBuffer(packetBuffer, pcrPid);
+
+    // Check if we found PCR or PTS
+    boolean foundTimestamp = (lastPcrValue != C.TIME_UNSET)
+        || (usePtsForDuration && lastPtsValue != C.TIME_UNSET);
+
+    if (foundTimestamp) {
+      // Found timestamp in this round, mark as complete
+      JLog.d("TsDurationReader --- readLastPcrValue: FOUND in round " + (progressiveSearchIndex + 1)
+          + " with " + bytesToSearch + " bytes");
+      isLastPcrValueRead = true;
+    } else {
+      // Not found, try next round
+      progressiveSearchIndex++;
+      if (progressiveSearchIndex < PROGRESSIVE_SEARCH_SIZES.length
+          && PROGRESSIVE_SEARCH_SIZES[progressiveSearchIndex] <= timestampSearchBytes) {
+        // More rounds available, seek to next round
+        JLog.d("TsDurationReader --- readLastPcrValue: NOT found, trying next round");
+        long nextBytesToSearch = getProgressiveSearchSize(inputLength);
+        seekPositionHolder.position = inputLength - nextBytesToSearch;
+        return Extractor.RESULT_SEEK;
+      } else {
+        // No more rounds, mark as complete (not found)
+        JLog.d("TsDurationReader --- readLastPcrValue: exhausted all rounds, marking complete");
+        isLastPcrValueRead = true;
+      }
+    }
+
     JLog.d("TsDurationReader --- readLastPcrValue: lastPcrValue=" + lastPcrValue);
     JLog.d("TsDurationReader --- readLastPcrValue: lastPtsValue=" + lastPtsValue);
-    isLastPcrValueRead = true;
     return Extractor.RESULT_CONTINUE;
   }
 
@@ -237,20 +300,9 @@ import java.io.IOException;
     int searchStartPosition = packetBuffer.getPosition();
     int searchEndPosition = packetBuffer.limit();
     JLog.d("TsDurationReader --- readLastPcrValueFromBuffer: searching from " + searchStartPosition + " to " + searchEndPosition + ", pcrPid=" + pcrPid + ", packetSize=" + packetSize);
-    if (usePtsForDuration) {
-      for (int searchPosition = searchStartPosition;
-          searchPosition <= searchEndPosition - packetSize;
-          searchPosition++) {
-        if (!TsUtil.isStartOfTsPacket(
-            packetBuffer.getData(), searchStartPosition, searchEndPosition, searchPosition, packetSize)) {
-          continue;
-        }
-        long ptsValue = readPtsFromPacket(packetBuffer, searchPosition);
-        if (ptsValue != C.TIME_UNSET) {
-          lastPtsValue = ptsValue;
-        }
-      }
-    }
+
+    // Step 1: Scan PCR first (priority)
+    JLog.d("TsDurationReader --- readLastPcrValueFromBuffer: Scanning PCR first");
     // We start searching 'TsExtractor.TS_PACKET_SIZE' bytes from the end to prevent trying to read
     // from an incomplete TS packet.
     for (int searchPosition = searchEndPosition - packetSize;
@@ -262,10 +314,46 @@ import java.io.IOException;
       }
       long pcrValue = TsUtil.readPcrFromPacket(packetBuffer, searchPosition, pcrPid);
       if (pcrValue != C.TIME_UNSET) {
-        JLog.d("TsDurationReader --- readLastPcrValueFromBuffer: at position " + searchPosition + ", pcrValue=" + pcrValue);
-        return pcrValue;
+        JLog.d("TsDurationReader --- readLastPcrValueFromBuffer: PCR found at position " + searchPosition + ", pcrValue=" + pcrValue);
+        return pcrValue;  // Return PCR immediately (priority)
       }
     }
+
+    // Step 2: PCR not found, scan PTS as fallback (if enabled)
+    if (usePtsForDuration) {
+      JLog.d("TsDurationReader --- readLastPcrValueFromBuffer: PCR not found, scanning PTS as fallback");
+      int tsPacketCount = 0;
+      int ptsFoundCount = 0;
+      long firstPtsPosition = -1;
+      long lastPtsPosition = -1;
+
+      for (int searchPosition = searchStartPosition;
+          searchPosition <= searchEndPosition - packetSize;
+          searchPosition++) {
+        if (!TsUtil.isStartOfTsPacket(
+            packetBuffer.getData(), searchStartPosition, searchEndPosition, searchPosition, packetSize)) {
+          continue;
+        }
+        tsPacketCount++;
+        long ptsValue = readPtsFromPacket(packetBuffer, searchPosition);
+        if (ptsValue != C.TIME_UNSET) {
+          lastPtsValue = ptsValue;
+          ptsFoundCount++;
+          long offsetFromStart = searchPosition - searchStartPosition;
+
+          if (firstPtsPosition < 0) {
+            firstPtsPosition = offsetFromStart;
+            JLog.d("TsDurationReader --- readLastPcrValueFromBuffer: FIRST PTS found at offset " + offsetFromStart + " bytes (" + tsPacketCount + " packets), pts=" + ptsValue);
+          }
+          lastPtsPosition = offsetFromStart;
+        }
+      }
+
+      JLog.d("TsDurationReader --- readLastPcrValueFromBuffer: PTS scan complete, packets=" + tsPacketCount + ", ptsFound=" + ptsFoundCount + ", firstAtOffset=" + firstPtsPosition + ", lastAtOffset=" + lastPtsPosition);
+    }
+
+    // Return TIME_UNSET to indicate neither PCR nor PTS found
+    JLog.d("TsDurationReader --- readLastPcrValueFromBuffer: Neither PCR nor PTS found");
     return C.TIME_UNSET;
   }
 

@@ -301,7 +301,7 @@ public class PlayerActivity extends AppCompatActivity
         @Nullable
         @Override
         protected Pair<ExoTrackSelection.Definition, Integer> selectAudioTrack(MappedTrackInfo mappedTrackInfo, @RendererCapabilities.Capabilities int[][][] rendererFormatSupports, @RendererCapabilities.AdaptiveSupport int[] rendererMixedMimeTypeAdaptationSupports, Parameters params) throws ExoPlaybackException {
-          JLog.d("PlayerActivity --- DefaultTrackSelector -- selectAudioTrack -- params=" + params );
+          JLog.d("PlayerActivity --- DefaultTrackSelector -- selectAudioTrack -- params=" + params + ", " + Thread.currentThread());
           int count = mappedTrackInfo.getRendererCount();
           for (int i = 0 ; i < count ; i++) {
             JLog.d("PlayerActivity --- DefaultTrackSelector -- selectAudioTrack -- render=" + mappedTrackInfo.getRendererName(i) + ", type=" + mappedTrackInfo.getRendererType(i) + ", support=" + mappedTrackInfo.getRendererSupport(i));
@@ -362,6 +362,7 @@ public class PlayerActivity extends AppCompatActivity
     extractorsFactory.setTsExtractorMode(TsExtractor.MODE_MULTI_PMT);
     extractorsFactory.setTsSupportDvhs(true);
     extractorsFactory.setTsEnablePTSDuration(true);
+    extractorsFactory.setTsExtractorTimestampSearchBytes(20 * 1024 * 1024); // 20MB max for progressive search
     extractorsFactory.setMp4ExtractorFlags(Mp4Extractor.FLAG_DETACH_MP3_LAYER);
     extractorsFactory.setFragmentedMp4ExtractorFlags(FragmentedMp4Extractor.FLAG_READ_DURATION_FROM_MOOF);
     extractorsFactory.setMp3ExtractorFlags(Mp3Extractor.FLAG_SNIFF_CHECK_MPEGPS);
