@@ -108,6 +108,7 @@ public final class TsDurationReaderTest {
     assertThat(tsDurationReader.getDurationUs() / 1000).isAtLeast(2_400);
     assertThat(tsDurationReader.getDurationUs() / 1000).isAtMost(2_600);
     assertThat(tsDurationReader.isPcrBasedDuration()).isFalse();
+    assertThat(tsDurationReader.getFirstPtsPid()).isEqualTo(256);
   }
 
   @Test
@@ -133,6 +134,7 @@ public final class TsDurationReaderTest {
     assertThat(tsDurationReader.getDurationUs() / 1000).isAtLeast(2_400);
     assertThat(tsDurationReader.getDurationUs() / 1000).isAtMost(2_600);
     assertThat(tsDurationReader.isPcrBasedDuration()).isFalse();
+    assertThat(tsDurationReader.getFirstPtsPid()).isEqualTo(256);
   }
 
   private static FakeExtractorInput createInput() throws IOException {

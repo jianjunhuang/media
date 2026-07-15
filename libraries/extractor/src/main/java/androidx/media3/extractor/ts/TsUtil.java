@@ -111,6 +111,92 @@ public final class TsUtil {
     return C.TIME_UNSET;
   }
 
+  /** Returns the PID read from a TS packet, or {@link C#INDEX_UNSET} if the header is invalid. */
+  static int readPidFromPacket(ParsableByteArray packetBuffer, int startOfPacket) {
+    packetBuffer.setPosition(startOfPacket);
+    if (packetBuffer.bytesLeft() < 4) {
+      return C.INDEX_UNSET;
+    }
+    int tsPacketHeader = packetBuffer.readInt();
+    if ((tsPacketHeader & 0x800000) != 0) {
+      return C.INDEX_UNSET;
+    }
+    return (tsPacketHeader & 0x1FFF00) >> 8;
+  }
+
+  /**
+   * Returns the PTS read from the PES header in a TS packet.
+   *
+   * @param expectedPid The required packet PID, or {@link C#INDEX_UNSET} to accept any PID.
+   */
+  static long readPtsFromPacket(
+      ParsableByteArray packetBuffer, int startOfPacket, int expectedPid) {
+    packetBuffer.setPosition(startOfPacket);
+    if (packetBuffer.bytesLeft() < 5) {
+      return C.TIME_UNSET;
+    }
+    int tsPacketHeader = packetBuffer.readInt();
+    if ((tsPacketHeader & 0x800000) != 0) {
+      return C.TIME_UNSET;
+    }
+    int pid = (tsPacketHeader & 0x1FFF00) >> 8;
+    if (expectedPid != C.INDEX_UNSET && pid != expectedPid) {
+      return C.TIME_UNSET;
+    }
+    boolean payloadUnitStartIndicator = (tsPacketHeader & 0x400000) != 0;
+    int adaptationFieldControl = (tsPacketHeader & 0x30) >> 4;
+    boolean hasAdaptation = adaptationFieldControl == 2 || adaptationFieldControl == 3;
+    boolean hasPayload = adaptationFieldControl == 1 || adaptationFieldControl == 3;
+    if (!hasPayload) {
+      return C.TIME_UNSET;
+    }
+
+    if (hasAdaptation) {
+      if (packetBuffer.bytesLeft() < 1) {
+        return C.TIME_UNSET;
+      }
+      int adaptationFieldLength = packetBuffer.readUnsignedByte();
+      if (packetBuffer.bytesLeft() < adaptationFieldLength) {
+        return C.TIME_UNSET;
+      }
+      packetBuffer.skipBytes(adaptationFieldLength);
+    }
+
+    if (!payloadUnitStartIndicator || packetBuffer.bytesLeft() < 9) {
+      return C.TIME_UNSET;
+    }
+    int prefix =
+        (packetBuffer.readUnsignedByte() << 16)
+            | (packetBuffer.readUnsignedByte() << 8)
+            | packetBuffer.readUnsignedByte();
+    if (prefix != 0x000001) {
+      return C.TIME_UNSET;
+    }
+    packetBuffer.skipBytes(3); // stream_id and PES_packet_length.
+    if (packetBuffer.bytesLeft() < 3) {
+      return C.TIME_UNSET;
+    }
+    packetBuffer.skipBytes(1); // PES flags.
+    int ptsDtsFlags = (packetBuffer.readUnsignedByte() >> 6) & 0x03;
+    packetBuffer.skipBytes(1); // PES_header_data_length.
+    if (ptsDtsFlags != 0x02 && ptsDtsFlags != 0x03) {
+      return C.TIME_UNSET;
+    }
+    if (packetBuffer.bytesLeft() < 5) {
+      return C.TIME_UNSET;
+    }
+    long b0 = packetBuffer.readUnsignedByte();
+    long b1 = packetBuffer.readUnsignedByte();
+    long b2 = packetBuffer.readUnsignedByte();
+    long b3 = packetBuffer.readUnsignedByte();
+    long b4 = packetBuffer.readUnsignedByte();
+    return ((b0 & 0x0EL) << 29)
+        | ((b1 & 0xFFL) << 22)
+        | ((b2 & 0xFEL) << 14)
+        | ((b3 & 0xFFL) << 7)
+        | ((b4 & 0xFEL) >> 1);
+  }
+
   /**
    * Returns the value of PCR base - first 33 bits in big endian order from the PCR bytes.
    *

@@ -56,6 +56,7 @@ import java.io.IOException;
   private long durationUs;
 
   private int packetSize;
+  private int firstPtsPid;
   private boolean usePtsForDuration;
 
   // Progressive search state
@@ -78,6 +79,7 @@ import java.io.IOException;
     firstPtsValue = C.TIME_UNSET;
     lastPtsValue = C.TIME_UNSET;
     durationUs = C.TIME_UNSET;
+    firstPtsPid = C.INDEX_UNSET;
     packetBuffer = new ParsableByteArray();
     progressiveSearchIndex = 0;
     JLog.d("TsDurationReader --- TsDurationReader: timestampSearchBytes=" + timestampSearchBytes);
@@ -208,6 +210,10 @@ import java.io.IOException;
     return firstPcrValue != C.TIME_UNSET;
   }
 
+  public int getFirstPtsPid() {
+    return firstPtsPid;
+  }
+
   private int finishReadDuration(ExtractorInput input) {
     packetBuffer.reset(Util.EMPTY_BYTE_ARRAY);
     isDurationRead = true;
@@ -276,8 +282,10 @@ import java.io.IOException;
           packetSize)) {
         continue;
       }
-      long ptsValue = readPtsFromPacket(packetBuffer, searchPosition);
+      long ptsValue =
+          TsUtil.readPtsFromPacket(packetBuffer, searchPosition, /* expectedPid= */ C.INDEX_UNSET);
       if (ptsValue != C.TIME_UNSET) {
+        firstPtsPid = TsUtil.readPidFromPacket(packetBuffer, searchPosition);
         return ptsValue;
       }
     }
@@ -378,7 +386,8 @@ import java.io.IOException;
           continue;
         }
         tsPacketCount++;
-        long ptsValue = readPtsFromPacket(packetBuffer, searchPosition);
+        long ptsValue =
+            TsUtil.readPtsFromPacket(packetBuffer, searchPosition, /* expectedPid= */ C.INDEX_UNSET);
         if (ptsValue != C.TIME_UNSET) {
           lastPtsValue = ptsValue;
           ptsFoundCount++;
@@ -400,86 +409,4 @@ import java.io.IOException;
     return C.TIME_UNSET;
   }
 
-  // Parses a PTS from a TS packet payload when present.
-  // TS packet layout (188 bytes typical):
-  //   [0x47][header:4 bytes]
-  //   header bits: TEI (bit23) | PUSI (bit22) | PID (13 bits) | AFC (2 bits)
-  //   AFC: 01 payload only, 10 adaptation only, 11 adaptation + payload
-  //   [adapt_len?][adaptation_field?] [payload -> PES]
-  //
-  // PES payload when PUSI=1 and prefix is 0x000001:
-  //   [00 00 01][stream_id][pes_len]
-  //   [flags1][flags2: PTS_DTS][hdr_len][PTS(5)]...
-  // PTS(5) layout (33 bits total):
-  //   b0: 0010 | PTS[32..30] | marker
-  //   b1: PTS[29..22]
-  //   b2: PTS[21..15] | marker
-  //   b3: PTS[14..7]
-  //   b4: PTS[6..0] | marker
-  private long readPtsFromPacket(ParsableByteArray packetBuffer, int startOfPacket) {
-    packetBuffer.setPosition(startOfPacket);
-    if (packetBuffer.bytesLeft() < 5) {
-      return C.TIME_UNSET;
-    }
-    int tsPacketHeader = packetBuffer.readInt();
-    if ((tsPacketHeader & 0x800000) != 0) {
-      return C.TIME_UNSET;
-    }
-    boolean payloadUnitStartIndicator = (tsPacketHeader & 0x400000) != 0;
-    int adaptationFieldControl = (tsPacketHeader & 0x30) >> 4;
-    boolean hasAdaptation = adaptationFieldControl == 2 || adaptationFieldControl == 3;
-    boolean hasPayload = adaptationFieldControl == 1 || adaptationFieldControl == 3;
-    if (!hasPayload) {
-      return C.TIME_UNSET;
-    }
-
-    if (hasAdaptation) {
-      if (packetBuffer.bytesLeft() < 1) {
-        return C.TIME_UNSET;
-      }
-      int adaptationFieldLength = packetBuffer.readUnsignedByte();
-      if (packetBuffer.bytesLeft() < adaptationFieldLength) {
-        return C.TIME_UNSET;
-      }
-      packetBuffer.skipBytes(adaptationFieldLength);
-    }
-
-    if (!payloadUnitStartIndicator) {
-      return C.TIME_UNSET;
-    }
-    if (packetBuffer.bytesLeft() < 9) {
-      return C.TIME_UNSET;
-    }
-    int prefix =
-        (packetBuffer.readUnsignedByte() << 16)
-            | (packetBuffer.readUnsignedByte() << 8)
-            | packetBuffer.readUnsignedByte();
-    if (prefix != 0x000001) {
-      return C.TIME_UNSET;
-    }
-    packetBuffer.skipBytes(1); // stream_id
-    packetBuffer.skipBytes(2); // PES_packet_length
-    if (packetBuffer.bytesLeft() < 3) {
-      return C.TIME_UNSET;
-    }
-    packetBuffer.skipBytes(1); // '10' + flags
-    int ptsDtsFlags = (packetBuffer.readUnsignedByte() >> 6) & 0x03;
-    int pesHeaderDataLength = packetBuffer.readUnsignedByte();
-    if (ptsDtsFlags == 0x02 || ptsDtsFlags == 0x03) {
-      if (packetBuffer.bytesLeft() < 5) {
-        return C.TIME_UNSET;
-      }
-      long b0 = packetBuffer.readUnsignedByte();
-      long b1 = packetBuffer.readUnsignedByte();
-      long b2 = packetBuffer.readUnsignedByte();
-      long b3 = packetBuffer.readUnsignedByte();
-      long b4 = packetBuffer.readUnsignedByte();
-      return ((b0 & 0x0EL) << 29)
-          | ((b1 & 0xFFL) << 22)
-          | ((b2 & 0xFEL) << 14)
-          | ((b3 & 0xFFL) << 7)
-          | ((b4 & 0xFEL) >> 1);
-    }
-    return C.TIME_UNSET;
-  }
 }

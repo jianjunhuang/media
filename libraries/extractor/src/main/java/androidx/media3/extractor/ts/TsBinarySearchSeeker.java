@@ -26,12 +26,10 @@ import androidx.media3.extractor.ExtractorInput;
 import java.io.IOException;
 
 /**
- * A seeker that supports seeking within TS stream using binary search.
+ * A seeker that supports seeking within TS streams using binary search.
  *
- * <p>This seeker uses the first and last PCR values within the stream, as well as the stream
- * duration to interpolate the PCR value of the seeking position. Then it performs binary search
- * within the stream to find a packets whose PCR value is within {@link #SEEK_TOLERANCE_US} from the
- * target PCR.
+ * <p>This seeker uses PCR or PTS values within the stream to find a packet whose timestamp is close
+ * to the requested seek time.
  */
 /* package */ final class TsBinarySearchSeeker extends BinarySearchSeeker {
 
@@ -46,9 +44,35 @@ import java.io.IOException;
       int pcrPid,
       int timestampSearchBytes,
       int packetSize) {
+    this(
+        new TsPcrSeeker(pcrPid, pcrTimestampAdjuster, timestampSearchBytes, packetSize),
+        streamDurationUs,
+        inputLength,
+        packetSize);
+  }
+
+  public static TsBinarySearchSeeker createForPts(
+      TimestampAdjuster ptsTimestampAdjuster,
+      long streamDurationUs,
+      long inputLength,
+      int ptsPid,
+      int timestampSearchBytes,
+      int packetSize) {
+    return new TsBinarySearchSeeker(
+        new TsPtsSeeker(ptsPid, ptsTimestampAdjuster, timestampSearchBytes, packetSize),
+        streamDurationUs,
+        inputLength,
+        packetSize);
+  }
+
+  private TsBinarySearchSeeker(
+      TimestampSeeker timestampSeeker,
+      long streamDurationUs,
+      long inputLength,
+      int packetSize) {
     super(
         new DefaultSeekTimestampConverter(),
-        new TsPcrSeeker(pcrPid, pcrTimestampAdjuster, timestampSearchBytes, packetSize),
+        timestampSeeker,
         streamDurationUs,
         /* floorTimePosition= */ 0,
         /* ceilingTimePosition= */ streamDurationUs + 1,
@@ -144,6 +168,96 @@ import java.io.IOException;
       } else {
         return TimestampSearchResult.NO_TIMESTAMP_IN_RANGE_RESULT;
       }
+    }
+
+    @Override
+    public void onSeekFinished() {
+      packetBuffer.reset(Util.EMPTY_BYTE_ARRAY);
+    }
+  }
+
+  private static final class TsPtsSeeker implements TimestampSeeker {
+
+    private final int ptsPid;
+    private final TimestampAdjuster ptsTimestampAdjuster;
+    private final int timestampSearchBytes;
+    private final int packetSize;
+    private final ParsableByteArray packetBuffer;
+
+    public TsPtsSeeker(
+        int ptsPid,
+        TimestampAdjuster ptsTimestampAdjuster,
+        int timestampSearchBytes,
+        int packetSize) {
+      this.ptsPid = ptsPid;
+      this.ptsTimestampAdjuster = ptsTimestampAdjuster;
+      this.timestampSearchBytes = timestampSearchBytes;
+      this.packetSize = packetSize;
+      packetBuffer = new ParsableByteArray();
+    }
+
+    @Override
+    public TimestampSearchResult searchForTimestamp(ExtractorInput input, long targetTimestamp)
+        throws IOException {
+      long inputPosition = input.getPosition();
+      int bytesToSearch = (int) min(timestampSearchBytes, input.getLength() - inputPosition);
+      packetBuffer.reset(bytesToSearch);
+      input.peekFully(packetBuffer.getData(), /* offset= */ 0, bytesToSearch);
+      return searchForPtsValueInBuffer(packetBuffer, targetTimestamp, inputPosition);
+    }
+
+    private TimestampSearchResult searchForPtsValueInBuffer(
+        ParsableByteArray packetBuffer, long targetTimeUs, long bufferStartOffset) {
+      int limit = packetBuffer.limit();
+      long closestTimeUsBelowTarget = C.TIME_UNSET;
+      long closestPositionBelowTarget = C.INDEX_UNSET;
+      long closestEndPositionBelowTarget = C.INDEX_UNSET;
+      long closestTimeUsAboveTarget = C.TIME_UNSET;
+      long closestPositionAboveTarget = C.INDEX_UNSET;
+
+      while (packetBuffer.bytesLeft() >= packetSize) {
+        int startOfPacket =
+            TsUtil.findSyncBytePosition(packetBuffer.getData(), packetBuffer.getPosition(), limit);
+        int endOfPacket = startOfPacket + packetSize;
+        if (endOfPacket > limit) {
+          break;
+        }
+        long ptsValue = TsUtil.readPtsFromPacket(packetBuffer, startOfPacket, ptsPid);
+        if (ptsValue != C.TIME_UNSET) {
+          long ptsTimeUs = ptsTimestampAdjuster.adjustTsTimestamp(ptsValue);
+          if (Math.abs(ptsTimeUs - targetTimeUs) <= SEEK_TOLERANCE_US) {
+            return TimestampSearchResult.targetFoundResult(bufferStartOffset + startOfPacket);
+          }
+          if (ptsTimeUs < targetTimeUs
+              && (closestTimeUsBelowTarget == C.TIME_UNSET
+                  || ptsTimeUs > closestTimeUsBelowTarget)) {
+            closestTimeUsBelowTarget = ptsTimeUs;
+            closestPositionBelowTarget = startOfPacket;
+            closestEndPositionBelowTarget = endOfPacket;
+          } else if (ptsTimeUs > targetTimeUs
+              && (closestTimeUsAboveTarget == C.TIME_UNSET
+                  || ptsTimeUs < closestTimeUsAboveTarget)) {
+            closestTimeUsAboveTarget = ptsTimeUs;
+            closestPositionAboveTarget = startOfPacket;
+          }
+        }
+        packetBuffer.setPosition(endOfPacket);
+      }
+
+      if (closestTimeUsBelowTarget != C.TIME_UNSET
+          && closestTimeUsAboveTarget != C.TIME_UNSET) {
+        return TimestampSearchResult.targetFoundResult(
+            bufferStartOffset + closestPositionBelowTarget);
+      }
+      if (closestTimeUsBelowTarget != C.TIME_UNSET) {
+        return TimestampSearchResult.underestimatedResult(
+            closestTimeUsBelowTarget, bufferStartOffset + closestEndPositionBelowTarget);
+      }
+      if (closestTimeUsAboveTarget != C.TIME_UNSET) {
+        return TimestampSearchResult.overestimatedResult(
+            closestTimeUsAboveTarget, bufferStartOffset + closestPositionAboveTarget);
+      }
+      return TimestampSearchResult.NO_TIMESTAMP_IN_RANGE_RESULT;
     }
 
     @Override

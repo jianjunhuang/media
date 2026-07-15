@@ -591,16 +591,28 @@ public final class TsExtractor implements Extractor {
     if (!hasOutputSeekMap) {
       hasOutputSeekMap = true;
       JLog.d("TsExtractor --- maybeOutputSeekMap -> " + durationReader.getDurationUs());
-      if (durationReader.getDurationUs() != C.TIME_UNSET
-          && durationReader.isPcrBasedDuration()) {
-        tsBinarySearchSeeker =
-            new TsBinarySearchSeeker(
-                durationReader.getPcrTimestampAdjuster(),
-                durationReader.getDurationUs(),
-                inputLength,
-                pcrPid,
-                timestampSearchBytes,
-                tsPacketSize);
+      if (durationReader.getDurationUs() != C.TIME_UNSET) {
+        if (durationReader.isPcrBasedDuration()) {
+          tsBinarySearchSeeker =
+              new TsBinarySearchSeeker(
+                  durationReader.getPcrTimestampAdjuster(),
+                  durationReader.getDurationUs(),
+                  inputLength,
+                  pcrPid,
+                  timestampSearchBytes,
+                  tsPacketSize);
+        } else if (durationReader.getFirstPtsPid() != C.INDEX_UNSET) {
+          tsBinarySearchSeeker =
+              TsBinarySearchSeeker.createForPts(
+                  durationReader.getPcrTimestampAdjuster(),
+                  durationReader.getDurationUs(),
+                  inputLength,
+                  durationReader.getFirstPtsPid(),
+                  timestampSearchBytes,
+                  tsPacketSize);
+        }
+      }
+      if (tsBinarySearchSeeker != null) {
         output.seekMap(tsBinarySearchSeeker.getSeekMap());
       } else {
         output.seekMap(new SeekMap.Unseekable(durationReader.getDurationUs()));
