@@ -17,6 +17,7 @@ package androidx.media3.extractor.ts;
 
 import static com.google.common.truth.Truth.assertThat;
 
+import androidx.media3.common.C;
 import androidx.media3.extractor.Extractor;
 import androidx.media3.extractor.PositionHolder;
 import androidx.media3.test.utils.FakeExtractorInput;
@@ -93,5 +94,67 @@ public final class TsDurationReaderTest {
       }
     }
     assertThat(tsDurationReader.getDurationUs() / 1000).isEqualTo(2500);
+  }
+
+  @Test
+  public void readDuration_invalidPcrPidWithPtsFallback_returnsDuration()
+      throws IOException, InterruptedException {
+    FakeExtractorInput input = createInput();
+    tsDurationReader.setPacketSize(TsExtractor.TS_PACKET_SIZE);
+    tsDurationReader.setUsePtsForDuration(true);
+
+    readDuration(input, /* pcrPid= */ 0);
+
+    assertThat(tsDurationReader.getDurationUs() / 1000).isAtLeast(2_400);
+    assertThat(tsDurationReader.getDurationUs() / 1000).isAtMost(2_600);
+    assertThat(tsDurationReader.isPcrBasedDuration()).isFalse();
+  }
+
+  @Test
+  public void readDuration_invalidPcrPidWithoutPtsFallback_returnsUnset()
+      throws IOException, InterruptedException {
+    FakeExtractorInput input = createInput();
+    tsDurationReader.setPacketSize(TsExtractor.TS_PACKET_SIZE);
+
+    readDuration(input, /* pcrPid= */ 0);
+
+    assertThat(tsDurationReader.getDurationUs()).isEqualTo(C.TIME_UNSET);
+  }
+
+  @Test
+  public void readDuration_pcrMissingWithPtsFallback_returnsDuration()
+      throws IOException, InterruptedException {
+    FakeExtractorInput input = createInput();
+    tsDurationReader.setPacketSize(TsExtractor.TS_PACKET_SIZE);
+    tsDurationReader.setUsePtsForDuration(true);
+
+    readDuration(input, /* pcrPid= */ 0x1FFE);
+
+    assertThat(tsDurationReader.getDurationUs() / 1000).isAtLeast(2_400);
+    assertThat(tsDurationReader.getDurationUs() / 1000).isAtMost(2_600);
+    assertThat(tsDurationReader.isPcrBasedDuration()).isFalse();
+  }
+
+  private static FakeExtractorInput createInput() throws IOException {
+    return new FakeExtractorInput.Builder()
+        .setData(
+            TestUtil.getByteArray(
+                ApplicationProvider.getApplicationContext(), "media/ts/bbb_2500ms.ts"))
+        .setSimulateIOErrors(false)
+        .setSimulateUnknownLength(false)
+        .setSimulatePartialReads(false)
+        .build();
+  }
+
+  private void readDuration(FakeExtractorInput input, int pcrPid) throws IOException {
+    while (!tsDurationReader.isDurationReadFinished()) {
+      int result = tsDurationReader.readDuration(input, seekPositionHolder, pcrPid);
+      if (result == Extractor.RESULT_END_OF_INPUT) {
+        break;
+      }
+      if (result == Extractor.RESULT_SEEK) {
+        input.setPosition((int) seekPositionHolder.position);
+      }
+    }
   }
 }

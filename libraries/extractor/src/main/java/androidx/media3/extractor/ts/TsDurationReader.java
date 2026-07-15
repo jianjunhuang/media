@@ -51,6 +51,7 @@ import java.io.IOException;
 
   private long firstPcrValue;
   private long lastPcrValue;
+  private long firstPtsValue;
   private long lastPtsValue;
   private long durationUs;
 
@@ -74,6 +75,7 @@ import java.io.IOException;
     pcrTimestampAdjuster = new TimestampAdjuster(/* firstSampleTimestampUs= */ 0);
     firstPcrValue = C.TIME_UNSET;
     lastPcrValue = C.TIME_UNSET;
+    firstPtsValue = C.TIME_UNSET;
     lastPtsValue = C.TIME_UNSET;
     durationUs = C.TIME_UNSET;
     packetBuffer = new ParsableByteArray();
@@ -136,9 +138,10 @@ import java.io.IOException;
         + ", isLastPcrValueRead=" + isLastPcrValueRead
         + ", firstPcrValue=" + firstPcrValue
         + ", lastPcrValue=" + lastPcrValue
+        + ", firstPtsValue=" + firstPtsValue
         + ", lastPtsValue=" + lastPtsValue
         + ", usePtsForDuration=" + usePtsForDuration);
-    if (pcrPid <= 0) {
+    if (pcrPid <= 0 && !usePtsForDuration) {
       return finishReadDuration(input);
     }
     if (!isLastPcrValueRead) {
@@ -151,11 +154,14 @@ import java.io.IOException;
     if (!isFirstPcrValueRead) {
       return readFirstPcrValue(input, seekPositionHolder, pcrPid);
     }
-    if (firstPcrValue == C.TIME_UNSET) {
+    if (firstPcrValue == C.TIME_UNSET
+        && (!usePtsForDuration || firstPtsValue == C.TIME_UNSET)) {
       return finishReadDuration(input);
     }
 
-    long minPcrPositionUs = pcrTimestampAdjuster.adjustTsTimestamp(firstPcrValue);
+    long firstTimestamp =
+        firstPcrValue != C.TIME_UNSET ? firstPcrValue : firstPtsValue;
+    long minPcrPositionUs = pcrTimestampAdjuster.adjustTsTimestamp(firstTimestamp);
     long maxTimestamp = lastPcrValue;
     if (usePtsForDuration) {
       if (maxTimestamp == C.TIME_UNSET
@@ -198,6 +204,10 @@ import java.io.IOException;
     return lastPtsValue;
   }
 
+  public boolean isPcrBasedDuration() {
+    return firstPcrValue != C.TIME_UNSET;
+  }
+
   private int finishReadDuration(ExtractorInput input) {
     packetBuffer.reset(Util.EMPTY_BYTE_ARRAY);
     isDurationRead = true;
@@ -220,12 +230,20 @@ import java.io.IOException;
     input.peekFully(packetBuffer.getData(), /* offset= */ 0, bytesToSearch);
 
     firstPcrValue = readFirstPcrValueFromBuffer(packetBuffer, pcrPid);
+    if (firstPcrValue == C.TIME_UNSET && usePtsForDuration) {
+      packetBuffer.setPosition(0);
+      firstPtsValue = readFirstPtsValueFromBuffer(packetBuffer);
+    }
     JLog.d("TsDurationReader --- readFirstPcrValue: firstPcrValue=" + firstPcrValue);
+    JLog.d("TsDurationReader --- readFirstPcrValue: firstPtsValue=" + firstPtsValue);
     isFirstPcrValueRead = true;
     return Extractor.RESULT_CONTINUE;
   }
 
   private long readFirstPcrValueFromBuffer(ParsableByteArray packetBuffer, int pcrPid) {
+    if (pcrPid <= 0) {
+      return C.TIME_UNSET;
+    }
     int searchStartPosition = packetBuffer.getPosition();
     int searchEndPosition = packetBuffer.limit();
     JLog.d("TsDurationReader --- readFirstPcrValueFromBuffer: searching from " + searchStartPosition + " to " + searchEndPosition + ", pcrPid=" + pcrPid + ", packetSize=" + packetSize);
@@ -239,6 +257,28 @@ import java.io.IOException;
       if (pcrValue != C.TIME_UNSET) {
           JLog.d("TsDurationReader --- readFirstPcrValueFromBuffer: at position " + searchPosition + ", pcrValue=" + pcrValue);
         return pcrValue;
+      }
+    }
+    return C.TIME_UNSET;
+  }
+
+  private long readFirstPtsValueFromBuffer(ParsableByteArray packetBuffer) {
+    int searchStartPosition = packetBuffer.getPosition();
+    int searchEndPosition = packetBuffer.limit();
+    for (int searchPosition = searchStartPosition;
+        searchPosition <= searchEndPosition - packetSize;
+        searchPosition++) {
+      if (!TsUtil.isStartOfTsPacket(
+          packetBuffer.getData(),
+          searchStartPosition,
+          searchEndPosition,
+          searchPosition,
+          packetSize)) {
+        continue;
+      }
+      long ptsValue = readPtsFromPacket(packetBuffer, searchPosition);
+      if (ptsValue != C.TIME_UNSET) {
+        return ptsValue;
       }
     }
     return C.TIME_UNSET;
@@ -301,21 +341,24 @@ import java.io.IOException;
     int searchEndPosition = packetBuffer.limit();
     JLog.d("TsDurationReader --- readLastPcrValueFromBuffer: searching from " + searchStartPosition + " to " + searchEndPosition + ", pcrPid=" + pcrPid + ", packetSize=" + packetSize);
 
-    // Step 1: Scan PCR first (priority)
-    JLog.d("TsDurationReader --- readLastPcrValueFromBuffer: Scanning PCR first");
-    // We start searching 'TsExtractor.TS_PACKET_SIZE' bytes from the end to prevent trying to read
-    // from an incomplete TS packet.
-    for (int searchPosition = searchEndPosition - packetSize;
-        searchPosition >= searchStartPosition;
-        searchPosition--) {
-      if (!TsUtil.isStartOfTsPacket(
-          packetBuffer.getData(), searchStartPosition, searchEndPosition, searchPosition, packetSize)) {
-        continue;
-      }
-      long pcrValue = TsUtil.readPcrFromPacket(packetBuffer, searchPosition, pcrPid);
-      if (pcrValue != C.TIME_UNSET) {
-        JLog.d("TsDurationReader --- readLastPcrValueFromBuffer: PCR found at position " + searchPosition + ", pcrValue=" + pcrValue);
-        return pcrValue;  // Return PCR immediately (priority)
+    if (pcrPid > 0) {
+      // We start searching one packet from the end to avoid reading an incomplete TS packet.
+      for (int searchPosition = searchEndPosition - packetSize;
+          searchPosition >= searchStartPosition;
+          searchPosition--) {
+        if (!TsUtil.isStartOfTsPacket(
+            packetBuffer.getData(),
+            searchStartPosition,
+            searchEndPosition,
+            searchPosition,
+            packetSize)) {
+          continue;
+        }
+        long pcrValue = TsUtil.readPcrFromPacket(packetBuffer, searchPosition, pcrPid);
+        if (pcrValue != C.TIME_UNSET) {
+          JLog.d("TsDurationReader --- readLastPcrValueFromBuffer: PCR found at position " + searchPosition + ", pcrValue=" + pcrValue);
+          return pcrValue;
+        }
       }
     }
 

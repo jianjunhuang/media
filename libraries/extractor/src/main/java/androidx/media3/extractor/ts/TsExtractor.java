@@ -591,7 +591,8 @@ public final class TsExtractor implements Extractor {
     if (!hasOutputSeekMap) {
       hasOutputSeekMap = true;
       JLog.d("TsExtractor --- maybeOutputSeekMap -> " + durationReader.getDurationUs());
-      if (durationReader.getDurationUs() != C.TIME_UNSET) {
+      if (durationReader.getDurationUs() != C.TIME_UNSET
+          && durationReader.isPcrBasedDuration()) {
         tsBinarySearchSeeker =
             new TsBinarySearchSeeker(
                 durationReader.getPcrTimestampAdjuster(),
