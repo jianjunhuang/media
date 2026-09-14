@@ -61,6 +61,7 @@ import java.io.IOException;
 
   // Progressive search state
   private int progressiveSearchIndex;
+  private int firstProgressiveSearchIndex;
   // Default TS packet size is 188 bytes, DEFAULT_TIMESTAMP_SEARCH_BYTES = 600 * 188 = 112800
   private static final int DEFAULT_TIMESTAMP_SEARCH_BYTES = 600 * 188;
   private static final int[] PROGRESSIVE_SEARCH_SIZES = {
@@ -82,21 +83,24 @@ import java.io.IOException;
     firstPtsPid = C.INDEX_UNSET;
     packetBuffer = new ParsableByteArray();
     progressiveSearchIndex = 0;
+    firstProgressiveSearchIndex = 0;
     JLog.d("TsDurationReader --- TsDurationReader: timestampSearchBytes=" + timestampSearchBytes);
   }
 
   /**
    * Returns the search size for the current progressive search attempt.
+   *
    * @param inputLength The total input length in bytes
+   * @param searchIndex The zero-based progressive search attempt index
    * @return The number of bytes to search in this attempt
    */
-  private int getProgressiveSearchSize(long inputLength) {
-    if (progressiveSearchIndex >= PROGRESSIVE_SEARCH_SIZES.length) {
+  private int getProgressiveSearchSize(long inputLength, int searchIndex) {
+    if (searchIndex >= PROGRESSIVE_SEARCH_SIZES.length) {
       // Fallback to configured maximum
       return (int) min(timestampSearchBytes, inputLength);
     }
 
-    int progressiveSize = PROGRESSIVE_SEARCH_SIZES[progressiveSearchIndex];
+    int progressiveSize = PROGRESSIVE_SEARCH_SIZES[searchIndex];
     // Don't exceed configured maximum
     return (int) min(progressiveSize, min(timestampSearchBytes, inputLength));
   }
@@ -223,8 +227,14 @@ import java.io.IOException;
 
   private int readFirstPcrValue(ExtractorInput input, PositionHolder seekPositionHolder, int pcrPid)
       throws IOException {
-    int bytesToSearch = (int) min(timestampSearchBytes, input.getLength());
-    JLog.d("TsDurationReader --- readFirstPcrValue: bytesToSearch=" + bytesToSearch);
+    long inputLength = input.getLength();
+    int bytesToSearch =
+        getProgressiveSearchSize(inputLength, firstProgressiveSearchIndex);
+    JLog.d(
+        "TsDurationReader --- readFirstPcrValue: round="
+            + (firstProgressiveSearchIndex + 1)
+            + ", bytesToSearch="
+            + bytesToSearch);
     int searchStartPosition = 0;
     if (input.getPosition() != searchStartPosition) {
       seekPositionHolder.position = searchStartPosition;
@@ -236,13 +246,27 @@ import java.io.IOException;
     input.peekFully(packetBuffer.getData(), /* offset= */ 0, bytesToSearch);
 
     firstPcrValue = readFirstPcrValueFromBuffer(packetBuffer, pcrPid);
-    if (firstPcrValue == C.TIME_UNSET && usePtsForDuration) {
+    int nextBytesToSearch =
+        getProgressiveSearchSize(inputLength, firstProgressiveSearchIndex + 1);
+    boolean canExpandSearch = nextBytesToSearch > bytesToSearch;
+    if (firstPcrValue == C.TIME_UNSET
+        && usePtsForDuration
+        && (pcrPid <= 0 || !canExpandSearch)) {
       packetBuffer.setPosition(0);
       firstPtsValue = readFirstPtsValueFromBuffer(packetBuffer);
     }
     JLog.d("TsDurationReader --- readFirstPcrValue: firstPcrValue=" + firstPcrValue);
     JLog.d("TsDurationReader --- readFirstPcrValue: firstPtsValue=" + firstPtsValue);
-    isFirstPcrValueRead = true;
+    boolean foundTimestamp =
+        firstPcrValue != C.TIME_UNSET
+            || (usePtsForDuration && firstPtsValue != C.TIME_UNSET);
+    if (foundTimestamp) {
+      isFirstPcrValueRead = true;
+    } else if (canExpandSearch) {
+      firstProgressiveSearchIndex++;
+    } else {
+      isFirstPcrValueRead = true;
+    }
     return Extractor.RESULT_CONTINUE;
   }
 
@@ -295,7 +319,7 @@ import java.io.IOException;
   private int readLastPcrValue(ExtractorInput input, PositionHolder seekPositionHolder, int pcrPid)
       throws IOException {
     long inputLength = input.getLength();
-    int bytesToSearch = getProgressiveSearchSize(inputLength);
+    int bytesToSearch = getProgressiveSearchSize(inputLength, progressiveSearchIndex);
     long searchStartPosition = inputLength - bytesToSearch;
 
     JLog.d("TsDurationReader --- readLastPcrValue: round=" + (progressiveSearchIndex + 1)
@@ -329,7 +353,8 @@ import java.io.IOException;
           && PROGRESSIVE_SEARCH_SIZES[progressiveSearchIndex] <= timestampSearchBytes) {
         // More rounds available, seek to next round
         JLog.d("TsDurationReader --- readLastPcrValue: NOT found, trying next round");
-        long nextBytesToSearch = getProgressiveSearchSize(inputLength);
+        long nextBytesToSearch =
+            getProgressiveSearchSize(inputLength, progressiveSearchIndex);
         seekPositionHolder.position = inputLength - nextBytesToSearch;
         return Extractor.RESULT_SEEK;
       } else {

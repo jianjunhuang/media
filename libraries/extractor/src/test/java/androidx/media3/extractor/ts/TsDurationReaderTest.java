@@ -97,6 +97,74 @@ public final class TsDurationReaderTest {
   }
 
   @Test
+  public void readDuration_largeMaximumSearchesStartProgressively()
+      throws IOException, InterruptedException {
+    byte[] data =
+        TestUtil.getByteArray(
+            ApplicationProvider.getApplicationContext(), "media/ts/bbb_2500ms.ts");
+    FakeExtractorInput input =
+        new FakeExtractorInput.Builder()
+            .setData(data)
+            .setSimulateIOErrors(false)
+            .setSimulateUnknownLength(false)
+            .setSimulatePartialReads(false)
+            .build();
+    tsDurationReader = new TsDurationReader(20 * 1024 * 1024);
+
+    assertThat(tsDurationReader.readDuration(input, seekPositionHolder, /* pcrPid= */ 256))
+        .isEqualTo(Extractor.RESULT_SEEK);
+    input.setPosition((int) seekPositionHolder.position);
+    assertThat(tsDurationReader.readDuration(input, seekPositionHolder, /* pcrPid= */ 256))
+        .isEqualTo(Extractor.RESULT_CONTINUE);
+    assertThat(tsDurationReader.readDuration(input, seekPositionHolder, /* pcrPid= */ 256))
+        .isEqualTo(Extractor.RESULT_SEEK);
+    input.setPosition((int) seekPositionHolder.position);
+
+    assertThat(tsDurationReader.readDuration(input, seekPositionHolder, /* pcrPid= */ 256))
+        .isEqualTo(Extractor.RESULT_CONTINUE);
+    assertThat(input.getPosition()).isEqualTo(0);
+    assertThat(input.getPeekPosition()).isEqualTo(TsExtractor.DEFAULT_TIMESTAMP_SEARCH_BYTES);
+  }
+
+  @Test
+  public void readDuration_firstPcrOutsideInitialWindow_expandsPeekFromStart()
+      throws IOException, InterruptedException {
+    byte[] fixture =
+        TestUtil.getByteArray(
+            ApplicationProvider.getApplicationContext(), "media/ts/bbb_2500ms.ts");
+    byte[] data = new byte[TsExtractor.DEFAULT_TIMESTAMP_SEARCH_BYTES + fixture.length];
+    System.arraycopy(
+        fixture, /* srcPos= */ 0, data, TsExtractor.DEFAULT_TIMESTAMP_SEARCH_BYTES, fixture.length);
+    FakeExtractorInput input =
+        new FakeExtractorInput.Builder()
+            .setData(data)
+            .setSimulateIOErrors(false)
+            .setSimulateUnknownLength(false)
+            .setSimulatePartialReads(false)
+            .build();
+    tsDurationReader = new TsDurationReader(20 * 1024 * 1024);
+
+    assertThat(tsDurationReader.readDuration(input, seekPositionHolder, /* pcrPid= */ 256))
+        .isEqualTo(Extractor.RESULT_SEEK);
+    input.setPosition((int) seekPositionHolder.position);
+    assertThat(tsDurationReader.readDuration(input, seekPositionHolder, /* pcrPid= */ 256))
+        .isEqualTo(Extractor.RESULT_CONTINUE);
+    assertThat(tsDurationReader.readDuration(input, seekPositionHolder, /* pcrPid= */ 256))
+        .isEqualTo(Extractor.RESULT_SEEK);
+    input.setPosition((int) seekPositionHolder.position);
+
+    assertThat(tsDurationReader.readDuration(input, seekPositionHolder, /* pcrPid= */ 256))
+        .isEqualTo(Extractor.RESULT_CONTINUE);
+    assertThat(input.getPosition()).isEqualTo(0);
+    assertThat(input.getPeekPosition()).isEqualTo(TsExtractor.DEFAULT_TIMESTAMP_SEARCH_BYTES);
+
+    assertThat(tsDurationReader.readDuration(input, seekPositionHolder, /* pcrPid= */ 256))
+        .isEqualTo(Extractor.RESULT_CONTINUE);
+    assertThat(input.getPosition()).isEqualTo(0);
+    assertThat(input.getPeekPosition()).isEqualTo(data.length);
+  }
+
+  @Test
   public void readDuration_invalidPcrPidWithPtsFallback_returnsDuration()
       throws IOException, InterruptedException {
     FakeExtractorInput input = createInput();
