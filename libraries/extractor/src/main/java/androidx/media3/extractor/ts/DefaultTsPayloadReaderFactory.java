@@ -193,7 +193,13 @@ public final class DefaultTsPayloadReaderFactory implements TsPayloadReader.Fact
                 DtsReader.FTOC_MAX_HEADER_SIZE,
                 MimeTypes.VIDEO_MP2T));
       case TsExtractor.TS_STREAM_TYPE_H262:
+        return new PesReader(new H262Reader(buildUserDataReader(esInfo), MimeTypes.VIDEO_MP2T));
       case TsExtractor.TS_STREAM_TYPE_DC2_H262:
+        if (esInfo.language != null) {
+          // Stream type 0x80 with language descriptor is HDMV LPCM audio, not DigiCipher II video.
+          // Avoiding H262Reader prevents waiting indefinitely for nonexistent video sequence headers.
+          return null;
+        }
         return new PesReader(new H262Reader(buildUserDataReader(esInfo), MimeTypes.VIDEO_MP2T));
       case TsExtractor.TS_STREAM_TYPE_H263:
         return new PesReader(new H263Reader(buildUserDataReader(esInfo), MimeTypes.VIDEO_MP2T));
@@ -228,6 +234,8 @@ public final class DefaultTsPayloadReaderFactory implements TsPayloadReader.Fact
         return new PesReader(new MpeghReader(MimeTypes.VIDEO_MP2T));
       case TsExtractor.TS_STREAM_TYPE_AVS:
         return new PesReader(new AVSReader());
+      case TsExtractor.TS_STREAM_TYPE_VC1:
+        return new PesReader(new VC1Reader());
       default:
         return null;
     }

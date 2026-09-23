@@ -158,6 +158,7 @@ public final class TsExtractor implements Extractor {
   public static final int TS_STREAM_TYPE_DC2_H262 = 0x80;
   public static final int TS_STREAM_TYPE_AIT = 0x101;
   public static final int TS_STREAM_TYPE_AVS = 0x42;
+  public static final int TS_STREAM_TYPE_VC1 = 0xEA;
 
   public static final int TS_SYNC_BYTE = 0x47; // First byte of each TS packet.
 
