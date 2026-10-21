@@ -20,6 +20,7 @@ import static androidx.media3.common.util.Assertions.checkState;
 import static androidx.media3.common.util.Assertions.checkStateNotNull;
 import static java.lang.annotation.ElementType.TYPE_USE;
 
+import android.util.Pair;
 import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
 import androidx.media3.common.C;
@@ -44,6 +45,8 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.PriorityQueue;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
@@ -91,6 +94,7 @@ public final class MidiExtractor implements Extractor, SeekMap {
    * described by this variable.
    */
   private static final long MAX_SAMPLE_DURATION_US = 100_000;
+  private static final long DEFAULT_TEMPO_US_PER_QUARTER_NOTE = 500_000L;
 
   private static final int HEADER_LEN_BYTES = 14;
   private final ArrayList<TrackChunk> trackChunkList;
@@ -100,9 +104,11 @@ public final class MidiExtractor implements Extractor, SeekMap {
   private @State int state;
   private int bytesRead;
   private int ticksPerQuarterNote;
+  private long durationUs = C.TIME_UNSET;
   private long currentTimestampUs;
   private long startTimeUs;
   private @MonotonicNonNull SingleKeyFrameTrackOutput trackOutput;
+  private @MonotonicNonNull ExtractorOutput extractorOutput;
 
   public MidiExtractor() {
     state = STATE_INITIALIZED;
@@ -119,6 +125,7 @@ public final class MidiExtractor implements Extractor, SeekMap {
       throw new IllegalStateException();
     }
 
+    extractorOutput = output;
     trackOutput = new SingleKeyFrameTrackOutput(output.track(0, C.TRACK_TYPE_AUDIO));
     trackOutput.format(
         new Format.Builder()
@@ -186,6 +193,9 @@ public final class MidiExtractor implements Extractor, SeekMap {
 
         midiFileData.setLimit(bytesRead);
         parseTracks();
+        if (extractorOutput != null) {
+          extractorOutput.seekMap(this);
+        }
 
         state = STATE_PREPARING_CHUNKS;
         return RESULT_CONTINUE;
@@ -252,13 +262,14 @@ public final class MidiExtractor implements Extractor, SeekMap {
 
   @Override
   public long getDurationUs() {
-    return C.TIME_UNSET;
+    return durationUs;
   }
 
   @Override
   public SeekPoints getSeekPoints(long timeUs) {
     if (state == STATE_PREPARING_CHUNKS || state == STATE_PARSING_SAMPLES) {
-      return new SeekPoints(new SeekPoint(timeUs, HEADER_LEN_BYTES));
+      long targetTimeUs = durationUs != C.TIME_UNSET ? Math.min(timeUs, durationUs) : timeUs;
+      return new SeekPoints(new SeekPoint(targetTimeUs, HEADER_LEN_BYTES));
     }
     return new SeekPoints(SeekPoint.START);
   }
@@ -284,6 +295,7 @@ public final class MidiExtractor implements Extractor, SeekMap {
 
     ticksPerQuarterNote = midiFileData.readShort();
 
+    ArrayList<byte[]> allTrackBytes = new ArrayList<>(trackCount);
     for (int currTrackIndex = 0; currTrackIndex < trackCount; currTrackIndex++) {
       int trackLengthBytes = parseTrackChunkHeader();
       byte[] trackEventsBytes = new byte[trackLengthBytes];
@@ -295,6 +307,8 @@ public final class MidiExtractor implements Extractor, SeekMap {
       midiFileData.readBytes(
           /* buffer= */ trackEventsBytes, /* offset= */ 0, /* length= */ trackLengthBytes);
 
+      allTrackBytes.add(trackEventsBytes);
+
       // TODO(b/228838584): Parse slices of midiFileData instead of instantiating a new array of the
       // event bytes from the entire track.
       ParsableByteArray currentChunkData = new ParsableByteArray(trackEventsBytes);
@@ -303,6 +317,8 @@ public final class MidiExtractor implements Extractor, SeekMap {
           new TrackChunk(fileFormat, ticksPerQuarterNote, currentChunkData, this::onTempoChanged);
       trackChunkList.add(trackChunk);
     }
+
+    durationUs = calculateDurationUs(allTrackBytes, fileFormat, ticksPerQuarterNote);
   }
 
   private int parseTrackChunkHeader() throws ParserException {
@@ -328,6 +344,141 @@ public final class MidiExtractor implements Extractor, SeekMap {
   private static boolean isMidiHeaderIdentifier(ParsableByteArray input) {
     int fileHeaderIdentifier = input.readInt();
     return fileHeaderIdentifier == FOURCC_MThd;
+  }
+
+  private static long calculateDurationUs(
+      List<byte[]> trackEventsBytesList, int fileFormat, int ticksPerQuarterNote) {
+    if (trackEventsBytesList.isEmpty() || ticksPerQuarterNote == 0) {
+      return C.TIME_UNSET;
+    }
+
+    ArrayList<Pair<Long, Long>> tempoMap = new ArrayList<>();
+    tempoMap.add(Pair.create(0L, DEFAULT_TEMPO_US_PER_QUARTER_NOTE));
+
+    long maxTicks = 0;
+    long sumTicks = 0;
+
+    for (byte[] trackBytes : trackEventsBytesList) {
+      long trackEndTick = scanTrackChunk(trackBytes, tempoMap);
+      if (trackEndTick > maxTicks) {
+        maxTicks = trackEndTick;
+      }
+      sumTicks += trackEndTick;
+    }
+
+    long totalTicks = (fileFormat == 2) ? sumTicks : maxTicks;
+    if (totalTicks <= 0) {
+      return 0;
+    }
+
+    if (ticksPerQuarterNote > 0) {
+      Collections.sort(tempoMap, (a, b) -> Long.compare(a.first, b.first));
+
+      long totalDurationUs = 0;
+      long curTick = 0;
+      long curTempoUs = DEFAULT_TEMPO_US_PER_QUARTER_NOTE;
+
+      for (Pair<Long, Long> tempoChange : tempoMap) {
+        long tempoTick = tempoChange.first;
+        if (tempoTick >= totalTicks) {
+          break;
+        }
+        if (tempoTick > curTick) {
+          totalDurationUs += (tempoTick - curTick) * curTempoUs / ticksPerQuarterNote;
+          curTick = tempoTick;
+        }
+        curTempoUs = tempoChange.second;
+      }
+
+      if (totalTicks > curTick) {
+        totalDurationUs += (totalTicks - curTick) * curTempoUs / ticksPerQuarterNote;
+      }
+      return totalDurationUs;
+    } else {
+      int fpsByte = (-ticksPerQuarterNote) >> 8;
+      double fps =
+          (fpsByte == 24) ? 24.0 : (fpsByte == 25) ? 25.0 : (fpsByte == 29) ? 29.97 : 30.0;
+      int ticksPerFrame = ticksPerQuarterNote & 0xFF;
+      if (ticksPerFrame > 0 && fps > 0) {
+        return (long) ((totalTicks * 1_000_000.0) / (fps * ticksPerFrame));
+      }
+      return C.TIME_UNSET;
+    }
+  }
+
+  private static long scanTrackChunk(byte[] trackBytes, ArrayList<Pair<Long, Long>> tempoMap) {
+    ParsableByteArray data = new ParsableByteArray(trackBytes);
+    long currentTick = 0;
+    int previousStatus = TrackEvent.DATA_FIELD_UNSET;
+
+    while (data.bytesLeft() > 0) {
+      long deltaTicks = readVariableLengthInt(data);
+      currentTick += deltaTicks;
+
+      if (data.bytesLeft() <= 0) {
+        break;
+      }
+
+      int firstByte = data.readUnsignedByte();
+      int statusByte;
+      boolean isRunningStatus = firstByte < 0x80;
+
+      if (isRunningStatus) {
+        if (previousStatus == TrackEvent.DATA_FIELD_UNSET) {
+          break;
+        }
+        statusByte = previousStatus;
+      } else {
+        statusByte = firstByte;
+      }
+
+      if (statusByte == 0xFF) {
+        if (data.bytesLeft() < 2) {
+          break;
+        }
+        int metaType = data.readUnsignedByte();
+        int eventLength = readVariableLengthInt(data);
+        if (metaType == 0x51 && eventLength == 3 && data.bytesLeft() >= 3) {
+          long usPerQuarterNote = data.readUnsignedInt24();
+          tempoMap.add(Pair.create(currentTick, usPerQuarterNote));
+        } else if (metaType == 0x2F) {
+          data.skipBytes(Math.min(eventLength, data.bytesLeft()));
+          break;
+        } else {
+          data.skipBytes(Math.min(eventLength, data.bytesLeft()));
+        }
+        previousStatus = TrackEvent.DATA_FIELD_UNSET;
+      } else if (statusByte == 0xF0 || statusByte == 0xF7) {
+        int eventLength = readVariableLengthInt(data);
+        data.skipBytes(Math.min(eventLength, data.bytesLeft()));
+        previousStatus = TrackEvent.DATA_FIELD_UNSET;
+      } else {
+        previousStatus = statusByte;
+        int command = statusByte & 0xF0;
+        int dataBytesNeeded = (command == 0xC0 || command == 0xD0) ? 1 : 2;
+        int bytesToSkip = isRunningStatus ? (dataBytesNeeded - 1) : dataBytesNeeded;
+        data.skipBytes(Math.min(bytesToSkip, data.bytesLeft()));
+      }
+    }
+
+    return currentTick;
+  }
+
+  private static int readVariableLengthInt(ParsableByteArray data) {
+    int result = 0;
+    int currentByte;
+    int bytesRead = 0;
+
+    do {
+      if (data.bytesLeft() <= 0) {
+        break;
+      }
+      currentByte = data.readUnsignedByte();
+      result = (result << 7) | (currentByte & 0x7F);
+      bytesRead++;
+    } while (((currentByte & 0x80) != 0) && bytesRead <= 4);
+
+    return result;
   }
 
   private void onTempoChanged(int tempoBpm, long ticks) {

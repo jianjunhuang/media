@@ -1,0 +1,28 @@
+seekMap:
+  isSeekable = true
+  duration = 8000000
+  getPosition(0) = [[timeUs=0, position=14]]
+  getPosition(1) = [[timeUs=1, position=14]]
+  getPosition(4000000) = [[timeUs=4000000, position=14]]
+  getPosition(8000000) = [[timeUs=8000000, position=14]]
+numberOfTracks = 1
+track 0:
+  total output bytes = 15
+  sample count = 3
+  format 0:
+    containerMimeType = audio/midi
+    sampleMimeType = audio/x-exoplayer-midi
+    codecs = audio/midi
+  sample 0:
+    time = 0
+    flags = 1
+    data = length 7, hash C95FA520
+  sample 1:
+    time = 0
+    flags = 0
+    data = length 5, hash 1CF3DA7
+  sample 2:
+    time = 8000000
+    flags = 0
+    data = length 3, hash FFFED733
+tracksEnded = true

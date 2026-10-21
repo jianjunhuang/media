@@ -17,6 +17,7 @@ package androidx.media3.decoder.midi;
 
 import static com.google.common.truth.Truth.assertThat;
 
+import androidx.media3.common.C;
 import androidx.media3.extractor.Extractor;
 import androidx.media3.extractor.PositionHolder;
 import androidx.media3.test.utils.DumpFileAsserts;
@@ -157,6 +158,55 @@ public final class MidiExtractorTest {
           ApplicationProvider.getApplicationContext(),
           fakeExtractorOutput,
           "extractordumps/midi/multi_note_tempo_changes.mid.dump");
+    }
+  }
+
+  @RunWith(AndroidJUnit4.class)
+  public static class MidiExtractorDurationTest {
+    @Test
+    public void testDuration_twinkle() throws IOException {
+      byte[] fileBytes =
+          TestUtil.getByteArray(
+              ApplicationProvider.getApplicationContext(),
+              "media/midi/Twinkle.mid");
+
+      FakeExtractorInput fakeExtractorInput =
+          new FakeExtractorInput.Builder().setData(fileBytes).build();
+      FakeExtractorOutput fakeExtractorOutput = new FakeExtractorOutput();
+      PositionHolder positionHolder = new PositionHolder();
+      MidiExtractor midiExtractor = new MidiExtractor();
+      midiExtractor.init(fakeExtractorOutput);
+
+      while (fakeExtractorOutput.seekMap == null || fakeExtractorOutput.seekMap.getDurationUs() == C.TIME_UNSET) {
+        if (midiExtractor.read(fakeExtractorInput, positionHolder) == Extractor.RESULT_END_OF_INPUT) {
+          break;
+        }
+      }
+
+      assertThat(fakeExtractorOutput.seekMap.getDurationUs()).isEqualTo(8_000_000L);
+    }
+
+    @Test
+    public void testDuration_29Testsound() throws IOException {
+      byte[] fileBytes =
+          TestUtil.getByteArray(
+              ApplicationProvider.getApplicationContext(),
+              "media/midi/29_Testsound.mid");
+
+      FakeExtractorInput fakeExtractorInput =
+          new FakeExtractorInput.Builder().setData(fileBytes).build();
+      FakeExtractorOutput fakeExtractorOutput = new FakeExtractorOutput();
+      PositionHolder positionHolder = new PositionHolder();
+      MidiExtractor midiExtractor = new MidiExtractor();
+      midiExtractor.init(fakeExtractorOutput);
+
+      while (fakeExtractorOutput.seekMap == null || fakeExtractorOutput.seekMap.getDurationUs() == C.TIME_UNSET) {
+        if (midiExtractor.read(fakeExtractorInput, positionHolder) == Extractor.RESULT_END_OF_INPUT) {
+          break;
+        }
+      }
+
+      assertThat(fakeExtractorOutput.seekMap.getDurationUs()).isEqualTo(21_000_000L);
     }
   }
 }
