@@ -148,6 +148,7 @@ public class MatroskaExtractor implements Extractor {
   private static final String CODEC_ID_MPEG4_ASP = "V_MPEG4/ISO/ASP";
   private static final String CODEC_ID_MPEG4_AP = "V_MPEG4/ISO/AP";
   private static final String CODEC_ID_H264 = "V_MPEG4/ISO/AVC";
+  private static final String CODEC_ID_MVC = "V_MPEG4/ISO/MVC";
   private static final String CODEC_ID_H265 = "V_MPEGH/ISO/HEVC";
   private static final String CODEC_ID_FOURCC = "V_MS/VFW/FOURCC";
   private static final String CODEC_ID_THEORA = "V_THEORA";
@@ -1703,7 +1704,9 @@ public class MatroskaExtractor implements Extractor {
     }
     size += sampleStrippedBytes.limit();
 
-    if (CODEC_ID_H264.equals(track.codecId) || CODEC_ID_H265.equals(track.codecId)) {
+    if (CODEC_ID_H264.equals(track.codecId)
+        || CODEC_ID_MVC.equals(track.codecId)
+        || CODEC_ID_H265.equals(track.codecId)) {
       // TODO: Deduplicate with Mp4Extractor.
 
       // Zero the top three bytes of the array that we'll use to decode nal unit lengths, in case
@@ -1734,7 +1737,7 @@ public class MatroskaExtractor implements Extractor {
             input.peekFully(seiPayload.getData(), 0, nalUnitSize);
             seiPayload.setPosition(0);
             int nalUnitType;
-            if (CODEC_ID_H264.equals(track.codecId)) {
+            if (CODEC_ID_H264.equals(track.codecId) || CODEC_ID_MVC.equals(track.codecId)) {
               // H.264: nal_unit_type is bits 3-7 of the first byte
               nalUnitType = seiPayload.getData()[0] & 0x1F;
             } else { // H.265
@@ -1743,7 +1746,9 @@ public class MatroskaExtractor implements Extractor {
             }
 
             // 3. 判断是否为 SEI
-            boolean isH264Sei = CODEC_ID_H264.equals(track.codecId) && nalUnitType == 6;
+            boolean isH264Sei =
+                (CODEC_ID_H264.equals(track.codecId) || CODEC_ID_MVC.equals(track.codecId))
+                    && nalUnitType == 6;
             boolean isH265Sei =
                 CODEC_ID_H265.equals(track.codecId) && (nalUnitType == 39 || nalUnitType == 40);
 
@@ -2052,6 +2057,7 @@ public class MatroskaExtractor implements Extractor {
       case CODEC_ID_MPEG4_ASP:
       case CODEC_ID_MPEG4_AP:
       case CODEC_ID_H264:
+      case CODEC_ID_MVC:
       case CODEC_ID_H265:
       case CODEC_ID_FOURCC:
       case CODEC_ID_THEORA:
@@ -2263,6 +2269,13 @@ public class MatroskaExtractor implements Extractor {
           initializationData = avcConfig.initializationData;
           nalUnitLengthFieldLength = avcConfig.nalUnitLengthFieldLength;
           codecs = avcConfig.codecs;
+          break;
+        case CODEC_ID_MVC:
+          mimeType = MimeTypes.VIDEO_MVC;
+          AvcConfig mvcConfig = AvcConfig.parse(new ParsableByteArray(getCodecPrivate(codecId)));
+          initializationData = mvcConfig.initializationData;
+          nalUnitLengthFieldLength = mvcConfig.nalUnitLengthFieldLength;
+          codecs = mvcConfig.codecs;
           break;
         case CODEC_ID_H265:
           mimeType = MimeTypes.VIDEO_H265;

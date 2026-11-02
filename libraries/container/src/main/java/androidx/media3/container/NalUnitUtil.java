@@ -106,6 +106,22 @@ public final class NalUnitUtil {
    */
   @Deprecated public static final int NAL_UNIT_TYPE_PREFIX = H264_NAL_UNIT_TYPE_PREFIX;
 
+  /** H.264 subset sequence parameter set. */
+  public static final int H264_NAL_UNIT_TYPE_SUBSET_SPS = 15;
+
+  /**
+   * @deprecated Use {@link #H264_NAL_UNIT_TYPE_SUBSET_SPS}
+   */
+  @Deprecated public static final int NAL_UNIT_TYPE_SUBSET_SPS = H264_NAL_UNIT_TYPE_SUBSET_SPS;
+
+  /** H.264 coded slice extension. */
+  public static final int H264_NAL_UNIT_TYPE_SLICE_EXTENSION = 20;
+
+  /**
+   * @deprecated Use {@link #H264_NAL_UNIT_TYPE_SLICE_EXTENSION}
+   */
+  @Deprecated public static final int NAL_UNIT_TYPE_SLICE_EXTENSION = H264_NAL_UNIT_TYPE_SLICE_EXTENSION;
+
   /** H.264 unspecified NAL unit. */
   public static final int H264_NAL_UNIT_TYPE_UNSPECIFIED = 24;
 

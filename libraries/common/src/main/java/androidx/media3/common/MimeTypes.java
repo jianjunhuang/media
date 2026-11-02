@@ -64,6 +64,8 @@ public final class MimeTypes {
 
   public static final String VIDEO_WMV3 = BASE_TYPE_VIDEO + "/wmv3";
 
+  public static final String VIDEO_MVC = BASE_TYPE_VIDEO + "/mvc";
+
   @UnstableApi public static final String VIDEO_FLV = BASE_TYPE_VIDEO + "/x-flv";
   public static final String VIDEO_DOLBY_VISION = BASE_TYPE_VIDEO + "/dolby-vision";
   public static final String VIDEO_OGG = BASE_TYPE_VIDEO + "/ogg";
@@ -443,6 +445,8 @@ public final class MimeTypes {
     codec = Ascii.toLowerCase(codec.trim());
     if (codec.startsWith("avc1") || codec.startsWith("avc3")) {
       return MimeTypes.VIDEO_H264;
+    } else if (codec.startsWith("mvc1") || codec.startsWith("mvc2")) {
+      return MimeTypes.VIDEO_MVC;
     } else if (codec.startsWith("hev1") || codec.startsWith("hvc1")) {
       return MimeTypes.VIDEO_H265;
     } else if (codec.startsWith("dvav")

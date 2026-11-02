@@ -64,6 +64,8 @@ public final class H264Reader implements ElementaryStreamReader {
 
   // State that should not be reset on seek.
   private boolean hasOutputFormat;
+  private boolean isMvc;
+  @Nullable private Format format;
 
   // Per PES packet state that gets reset at the start of each PES packet.
   private long pesTimeUs;
@@ -234,6 +236,10 @@ public final class H264Reader implements ElementaryStreamReader {
 
       // We've seen the start of a NAL unit of the following type.
       int nalUnitType = NalUnitUtil.getNalUnitType(dataArray, nalUnitOffset);
+      if (nalUnitType == NalUnitUtil.H264_NAL_UNIT_TYPE_SUBSET_SPS
+          || nalUnitType == NalUnitUtil.H264_NAL_UNIT_TYPE_SLICE_EXTENSION) {
+        onMvcDetected();
+      }
 
       // Case of a 4 byte start code prefix 0x00000001, recoil NAL unit offset by one byte
       // to avoid previous byte being assigned to the previous access unit.
@@ -316,18 +322,22 @@ public final class H264Reader implements ElementaryStreamReader {
                   spsData.constraintsFlagsAndReservedZero2Bits,
                   spsData.levelIdc);
 
+          if (isMvcProfile(spsData.profileIdc)) {
+            isMvc = true;
+          }
+
           if (ENABLE_H264_DUMP) {
             // DEBUG: 打印 SPS/PPS 信息
             androidx.media3.common.util.JLog.i("H264Reader",
-                    String.format("✓ Format configured: %dx%d, codec=%s, spsLen=%d, ppsLen=%d",
-                            spsData.width, spsData.height, codecs, sps.nalLength, pps.nalLength));
+                    String.format("✓ Format configured: %dx%d, codec=%s, spsLen=%d, ppsLen=%d, isMvc=%b",
+                            spsData.width, spsData.height, codecs, sps.nalLength, pps.nalLength, isMvc));
           }
 
-          output.format(
+          format =
               new Format.Builder()
                   .setId(formatId)
                   .setContainerMimeType(containerMimeType)
-                  .setSampleMimeType(MimeTypes.VIDEO_H264)
+                  .setSampleMimeType(isMvc ? MimeTypes.VIDEO_MVC : MimeTypes.VIDEO_H264)
                   .setCodecs(codecs)
                   .setWidth(spsData.width)
                   .setHeight(spsData.height)
@@ -342,7 +352,8 @@ public final class H264Reader implements ElementaryStreamReader {
                   .setPixelWidthHeightRatio(spsData.pixelWidthHeightRatio)
                   .setInitializationData(initializationData)
                   .setMaxNumReorderSamples(spsData.maxNumReorderFrames)
-                  .build());
+                  .build();
+          output.format(format);
           hasOutputFormat = true;
           seiReader.setReorderingQueueSize(spsData.maxNumReorderFrames);
           sampleReader.putSps(spsData);
@@ -352,6 +363,9 @@ public final class H264Reader implements ElementaryStreamReader {
         }
       } else if (sps.isCompleted()) {
         NalUnitUtil.SpsData spsData = NalUnitUtil.parseSpsNalUnit(sps.nalData, 3, sps.nalLength);
+        if (isMvcProfile(spsData.profileIdc)) {
+          onMvcDetected();
+        }
         seiReader.setReorderingQueueSize(spsData.maxNumReorderFrames);
         sampleReader.putSps(spsData);
         sps.reset();
@@ -374,6 +388,26 @@ public final class H264Reader implements ElementaryStreamReader {
       // keyframes until we see another random access indicator.
       randomAccessIndicator = false;
     }
+  }
+
+  @RequiresNonNull("output")
+  private void onMvcDetected() {
+    if (!isMvc) {
+      isMvc = true;
+      if (hasOutputFormat && format != null && !MimeTypes.VIDEO_MVC.equals(format.sampleMimeType)) {
+        format = format.buildUpon().setSampleMimeType(MimeTypes.VIDEO_MVC).build();
+        output.format(format);
+      }
+    }
+  }
+
+  private static boolean isMvcProfile(int profileIdc) {
+    return profileIdc == 118
+        || profileIdc == 128
+        || profileIdc == 134
+        || profileIdc == 135
+        || profileIdc == 138
+        || profileIdc == 139;
   }
 
   @EnsuresNonNull({"output", "sampleReader"})
