@@ -250,6 +250,15 @@ public final class PsExtractor implements Extractor {
       if (payloadReader == null) {
         @Nullable ElementaryStreamReader elementaryStreamReader = null;
         if (streamId == PRIVATE_STREAM_1) {
+          // DVD-Video/MPEG-PS private_stream_1 (0xBD) multiplexes AC-3, DTS, LPCM, and subtitles.
+          // Peek the first payload byte (sub_stream_id) to accurately map the elementary stream.
+          int subStreamId = peekSubStreamId(input);
+          if (subStreamId >= 0xA0 && subStreamId <= 0xAF) {
+            // Media3 lacks an LPCM reader for MPEG-PS. Explicitly declare unsupported feature
+            // so that fallback switcher can smoothly route to FFmpegExtractor before READY.
+            throw ParserException.createForUnsupportedContainerFeature(
+                "MPEG-PS LPCM audio (sub_stream_id 0x" + Integer.toHexString(subStreamId) + ") is not supported");
+          }
           // Private stream, used for AC3 audio.
           // NOTE: This may need further parsing to determine if its DTS, but that's likely only
           // valid for DVDs.
@@ -417,5 +426,36 @@ public final class PsExtractor implements Extractor {
         timeUs = timestampAdjuster.adjustTsTimestamp(pts);
       }
     }
+  }
+
+  /**
+   * Peeks the sub_stream_id from the private_stream_1 PES payload without consuming input position.
+   * Returns -1 if unable to peek the required header bytes.
+   */
+  private int peekSubStreamId(ExtractorInput input) throws IOException {
+    input.resetPeekPosition();
+    // Start code (4 bytes) + PES length (2 bytes) + PES flags & header length (3 bytes) = 9 bytes
+    byte[] scratch = new byte[9];
+    if (!input.peekFully(scratch, 0, 9, /* allowEndOfInput= */ true)) {
+      input.resetPeekPosition();
+      input.advancePeekPosition(4);
+      return -1;
+    }
+    // Verify MPEG-2 PES header marker '10' on 7th byte (scratch[6])
+    if ((scratch[6] & 0xC0) != 0x80) {
+      input.resetPeekPosition();
+      input.advancePeekPosition(4);
+      return -1;
+    }
+    int headerDataLength = scratch[8] & 0xFF; // PES_header_data_length
+    input.advancePeekPosition(headerDataLength);
+    byte[] subIdByte = new byte[1];
+    int result = -1;
+    if (input.peekFully(subIdByte, 0, 1, /* allowEndOfInput= */ true)) {
+      result = subIdByte[0] & 0xFF;
+    }
+    input.resetPeekPosition();
+    input.advancePeekPosition(4);
+    return result;
   }
 }

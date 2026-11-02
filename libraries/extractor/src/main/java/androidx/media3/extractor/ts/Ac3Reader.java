@@ -142,10 +142,15 @@ public final class Ac3Reader implements ElementaryStreamReader {
           break;
         case STATE_READING_HEADER:
           if (continueRead(data, headerScratchBytes.getData(), HEADER_SIZE)) {
-            parseHeader();
-            headerScratchBytes.setPosition(0);
-            output.sampleData(headerScratchBytes, HEADER_SIZE);
-            state = STATE_READING_SAMPLE;
+            if (parseHeader()) {
+              headerScratchBytes.setPosition(0);
+              output.sampleData(headerScratchBytes, HEADER_SIZE);
+              state = STATE_READING_SAMPLE;
+            } else {
+              // False-positive syncword: reset to search for next syncword safely.
+              state = STATE_FINDING_SYNC;
+              bytesRead = 0;
+            }
           }
           break;
         case STATE_READING_SAMPLE:
@@ -211,11 +216,16 @@ public final class Ac3Reader implements ElementaryStreamReader {
     return false;
   }
 
-  /** Parses the sample header. */
+  /** Parses the sample header. Returns false if the header is invalid (false-positive sync). */
   @RequiresNonNull("output")
-  private void parseHeader() {
+  private boolean parseHeader() {
     headerScratchBits.setPosition(0);
     SyncFrameInfo frameInfo = Ac3Util.parseAc3SyncframeInfo(headerScratchBits);
+    if (frameInfo.frameSize == C.LENGTH_UNSET
+        || frameInfo.mimeType == null
+        || frameInfo.sampleRate <= 0) {
+      return false;
+    }
     if (format == null
         || frameInfo.channelCount != format.channelCount
         || frameInfo.sampleRate != format.sampleRate
@@ -241,5 +251,6 @@ public final class Ac3Reader implements ElementaryStreamReader {
     // In this class a sample is an access unit (syncframe in AC-3), but Format#sampleRate
     // specifies the number of PCM audio samples per second.
     sampleDurationUs = C.MICROS_PER_SECOND * frameInfo.sampleCount / format.sampleRate;
+    return true;
   }
 }

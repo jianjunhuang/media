@@ -480,8 +480,29 @@ public final class Ac3Util {
         mimeType = null;
       }
       int frmsizecod = data.readBits(6);
-      bitrate = BITRATE_BY_HALF_FRMSIZECOD[frmsizecod / 2] * 1000;
+      int halfFrmsizecod = frmsizecod / 2;
+      if (halfFrmsizecod >= BITRATE_BY_HALF_FRMSIZECOD.length) {
+        return new SyncFrameInfo(
+            /* mimeType= */ null,
+            streamType,
+            /* channelCount= */ Format.NO_VALUE,
+            /* sampleRate= */ Format.NO_VALUE,
+            /* frameSize= */ C.LENGTH_UNSET,
+            /* sampleCount= */ 0,
+            /* bitrate= */ Format.NO_VALUE);
+      }
+      bitrate = BITRATE_BY_HALF_FRMSIZECOD[halfFrmsizecod] * 1000;
       frameSize = getAc3SyncframeSize(fscod, frmsizecod);
+      if (frameSize == C.LENGTH_UNSET) {
+        return new SyncFrameInfo(
+            /* mimeType= */ null,
+            streamType,
+            /* channelCount= */ Format.NO_VALUE,
+            /* sampleRate= */ Format.NO_VALUE,
+            /* frameSize= */ C.LENGTH_UNSET,
+            /* sampleCount= */ 0,
+            /* bitrate= */ Format.NO_VALUE);
+      }
       data.skipBits(5 + 3); // bsid, bsmod
       acmod = data.readBits(3);
       if ((acmod & 0x01) != 0 && acmod != 1) {

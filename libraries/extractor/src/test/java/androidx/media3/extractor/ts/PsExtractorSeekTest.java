@@ -16,10 +16,13 @@
 package androidx.media3.extractor.ts;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertThrows;
 
 import android.content.Context;
 import android.net.Uri;
 import androidx.media3.common.C;
+import androidx.media3.common.ParserException;
+import androidx.media3.common.util.Util;
 import androidx.media3.datasource.DataSourceUtil;
 import androidx.media3.datasource.DataSpec;
 import androidx.media3.datasource.DefaultDataSource;
@@ -357,5 +360,28 @@ public final class PsExtractorSeekTest {
         input.setPosition((int) positionHolder.position);
       }
     }
+  }
+
+  @Test
+  public void read_withMpegPsLpcm_throwsParserException() throws Exception {
+    byte[] psData =
+        Util.getBytesFromHexString("000001BA440204000401010303F8000001BD000A8000020000A01122334455");
+    PsExtractor extractor = new PsExtractor();
+    FakeExtractorOutput output = new FakeExtractorOutput();
+    extractor.init(output);
+    FakeExtractorInput input = new FakeExtractorInput.Builder().setData(psData).build();
+
+    PositionHolder positionHolder = new PositionHolder();
+    assertThrows(
+        ParserException.class,
+        () -> {
+          int readResult = Extractor.RESULT_CONTINUE;
+          while (readResult != Extractor.RESULT_END_OF_INPUT) {
+            readResult = extractor.read(input, positionHolder);
+            if (readResult == Extractor.RESULT_SEEK) {
+              input.setPosition((int) positionHolder.position);
+            }
+          }
+        });
   }
 }
